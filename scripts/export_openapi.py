@@ -25,14 +25,22 @@ OUTPUT = ROOT / "frontend" / "shared" / "openapi.json"
 
 
 def main() -> None:
-    """导出 OpenAPI schema 到 frontend/shared/openapi.json。"""
+    """导出 OpenAPI schema 到 frontend/shared/openapi.json。
+
+    --check：只比对不落盘，schema 与仓库内文件不一致时退出码 1（供 make check 使用）。
+    """
     from services.api.main import app
 
     schema = app.openapi()
+    fresh = json.dumps(schema, ensure_ascii=False, indent=2)
+    if "--check" in sys.argv:
+        if not OUTPUT.exists() or OUTPUT.read_text(encoding="utf-8") != fresh:
+            print("[check失败] openapi.json 已过期，请执行: python scripts/export_openapi.py")
+            sys.exit(1)
+        print(f"openapi.json 与当前路由一致（{len(schema.get('paths', {}))} 个路径）")
+        return
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_text(
-        json.dumps(schema, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    OUTPUT.write_text(fresh, encoding="utf-8")
     print(f"已导出 {len(schema.get('paths', {}))} 个路径 -> {OUTPUT}")
 
 

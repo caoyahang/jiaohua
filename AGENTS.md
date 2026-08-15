@@ -89,7 +89,7 @@
 - 单测与**真实 API 签名**对齐：改了被测函数，同一次变更里改测试；禁止用 `pytest.importorskip`/`skip` 长期搪塞（跨板块未就绪时允许临时使用，就绪后必须补齐为真实断言）。
 - 测试数据自己构造、可复现（参照现有三个 unit 文件风格）；断言要算得出期望值，禁止 `assert result is not None` 式空转。
 - 红线的测试永不删除：换向窗口 2~3 分钟强校验、K3=K1×K2 恒等式、约束违反量口径。
-- 提交前跑 `python -m pytest tests/ -q`，全绿才算完成。
+- 提交前跑 `make check`（评审门禁：pytest + 红线 grep + OpenAPI 契约新鲜度；`make check-full` 追加前端 tsc），全绿才算完成；pre-commit 钩子已挂同一脚本。
 
 ## 5. 脚本/运维规范（`scripts/`）
 

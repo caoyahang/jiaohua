@@ -1,7 +1,15 @@
 # AI焦化厂智能化平台 - 快捷命令
 # 使用：make up / make down / make init-db / make test
 
-.PHONY: up down init-db test logs ps
+.PHONY: up down init-db test check check-full logs ps
+
+# 变更后评审门禁（pre-commit 钩子也走这里）
+check:
+	bash scripts/check.sh
+
+# 完整门禁：追加四个前端工程的 tsc 类型检查
+check-full:
+	bash scripts/check.sh --full
 
 # 启动全部服务
 up:
