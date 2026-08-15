@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  # 时序数据库
+  tdengine:
+    image: tdengine/tdengine:3.0
+    ports:
+      - "6030:6030"
+    volumes:
+      - tdengine_data:/var/lib/taos
+    environment:
+      - TAOS_OPTIONS="--datadir /var/lib/taos"
+
+  # 关系数据库
+  postgres:
+    image: postgres:15
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=coke_plant
+      - POSTGRES_USER=ai_admin
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+
+  # 缓存
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  # 后端API
+  api:
+    build: ./services/api
+    ports:
+      - "8000:8000"
+    depends_on:
+      - tdengine
+      - postgres
+      - redis
+    environment:
+      - DATABASE_URL=postgresql://ai_admin:${DB_PASSWORD}@postgres/coke_plant
+      - TDENGINE_URL=taos://tdengine:6030
+      - REDIS_URL=redis://redis:6379
+
+  # 数据采集
+  collector:
+    build: ./data/collector
+    depends_on:
+      - tdengine
+      - postgres
+    environment:
+      - OPC_UA_ENDPOINT=opc.tcp://dcs-server:4840
+      - TDENGINE_URL=taos://tdengine:6030
+
+  # 定时任务
+  scheduler:
+    build: ./services/scheduler
+    depends_on:
+      - api
+      - redis
+
+  # 模型训练（GPU可选）
+  trainer:
+    build: ./models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - model_data:/app/models
+
+  # 监控
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+
+volumes:
+  tdengine_data:
+  pg_data:
+  model_data:

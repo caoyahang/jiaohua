@@ -1,0 +1,4 @@
+# 兼容入口：依赖的唯一声明在 pyproject.toml（方案§6.1），本文件仅供
+# Dockerfile / deploy.sh 等既有流程执行 pip install -r requirements.txt。
+# 改依赖请改 pyproject.toml，不要在本文件添加包。
+.

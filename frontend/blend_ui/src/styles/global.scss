@@ -1,0 +1,22 @@
+/**
+ * 全局样式：Tailwind 指令 + reset + 全局排版。
+ * 组件样式一律用 Tailwind 类或 *.styled.ts，此处只管全局。
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family:
+    'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}

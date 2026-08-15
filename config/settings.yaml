@@ -1,0 +1,150 @@
+# ============================================================
+# AI焦化厂智能化平台 - 全局配置
+# 依据：《AI焦化厂智能化落地方案 V1.1》第3章（数据底座建设）
+# ============================================================
+
+project:
+  name: "coke_ai"
+  version: "0.1.0"
+  timezone: "Asia/Shanghai"
+  log_level: "INFO"
+
+# ------------------------------------------------------------
+# 数据库连接（连接串一律从环境变量读取，不在仓库中落明文，见 .env.example）
+# ------------------------------------------------------------
+database:
+  postgresql:
+    url_env: "DATABASE_URL"          # postgresql://user:pass@host:5432/coke_plant
+    pool_size: 10
+    max_overflow: 20
+    pool_timeout_seconds: 30
+  tdengine:
+    url_env: "TDENGINE_URL"          # taos://host:6030
+    database: "coke_plant_ts"
+  redis:
+    url_env: "REDIS_URL"             # redis://host:6379
+    db: 0
+    # 热特征缓存 / 实时告警队列 / Pub-Sub 信道前缀
+    key_prefix: "coke_ai:"
+    alarm_channel: "coke_ai:alarm"
+
+# ------------------------------------------------------------
+# 数据采集（频率分级，对齐文档3.2.1采集频率要求）
+# ------------------------------------------------------------
+collection:
+  # 采样频率分级（秒）：工艺实时点1s/10s/30s，化产等慢变量1min
+  sampling_levels:
+    fast: 1        # 火道温度等核心控制变量（最低要求1秒，见3.2.2）
+    medium: 10     # 集气管压力、设备状态点（≤10秒）
+    slow: 30       # 煤气流量/分烟道吸力/残氧（≤30秒）
+    minute: 60     # 化产系统、热值仪等（≤1分钟）
+  opc_ua:
+    endpoint_env: "OPC_UA_ENDPOINT"  # opc.tcp://dcs-server:4840
+    security_mode: "SignAndEncrypt"  # 见3.2.2接口技术规格书
+    auth_mode: "username_password"   # Username/Password or Certificate
+    username_env: "OPC_UA_USERNAME"
+    password_env: "OPC_UA_PASSWORD"
+    reconnect_interval_seconds: 5
+    reconnect_max_retries: 0         # 0 = 无限重试（生产建议无限）
+    history_read: true
+    history_depth_days: 30           # 3.2.2：history_depth "30 days minimum"
+  modbus:
+    host_env: "MODBUS_HOST"
+    port_env: "MODBUS_PORT"
+    unit_id: 1
+    timeout_seconds: 3
+    poll_interval_seconds: 10        # 设备状态 ≤ 10秒
+  rtsp:
+    reconnect_interval_seconds: 10
+    frame_buffer_size: 2             # 只保留最新帧，推理消费不掉直接丢旧帧
+    # 各路摄像头接入地址从环境变量读取：RTSP_URL_<CAMERA_ID>
+
+# ------------------------------------------------------------
+# 数据保存周期（3.3数据治理：热7天 / 温6月 / 冷10年）
+# ------------------------------------------------------------
+retention:
+  hot_days: 7        # 热数据：原始高频时序，TDengine短期保留
+  warm_months: 6     # 温数据：降采样后的分钟级时序
+  cold_years: 10     # 冷数据：归档（业务数据/化验数据/模型训练集）
+  tdengine_keep_days: 7
+  tdengine_warm_keep_days: 180
+
+# ------------------------------------------------------------
+# 数据质量校验（3.3：入库前自动校验——范围检查、突变检查、缺失插值）
+# ------------------------------------------------------------
+quality_check:
+  # 换向期剔除窗口（分钟）：换向前后2~3分钟数据为脏数据（V1.1红线，4.2.6）
+  reversal_exclusion:
+    enabled: true
+    window_before_minutes: 2
+    window_after_minutes: 3
+    # 换向事件来源点位（在 dcs_tags.yaml 中，如换向机构状态）
+    event_tag: "reversal_status"
+  # 缺失处理
+  missing:
+    max_interp_gap_seconds: 300      # 缺口≤5分钟做线性插值，超出标缺失
+    interp_method: "linear"
+  # 突变检查（相邻采样点变化率上限，超限时打标记）
+  spike:
+    enabled: true
+    window_size: 5
+    # 各类物理量的单步最大允许变化（与下方 alarm 阈值单位一致）
+    max_step:
+      fire_channel_temp: 50.0        # ℃/次（正常炉温不可能秒级跳50度）
+      gas_flow: 2000.0               # m³/h
+      flue_suction: 30.0             # Pa
+      collector_pressure: 50.0       # Pa
+      oxygen_content: 2.0            # %
+      motor_current: 50.0            # A
+      bearing_temp: 5.0              # ℃
+      vibration_speed: 3.0           # mm/s
+  # 物理范围检查（超出硬范围的数据直接判废，标记不入建模）
+  range:
+    fire_channel_temp: [900.0, 1400.0]   # ℃
+    gas_flow: [0.0, 60000.0]             # m³/h
+    flue_suction: [0.0, 500.0]           # Pa
+    collector_pressure: [0.0, 400.0]     # Pa
+    oxygen_content: [0.0, 21.0]          # %
+    ammonia_flow: [0.0, 200.0]           # t/h
+    coal_gas_calorific: [15000.0, 20000.0]  # kJ/m³
+    bearing_temp: [0.0, 120.0]           # ℃
+    vibration_speed: [0.0, 50.0]         # mm/s
+  # 处理延迟目标：≤5秒（3.3）
+  target_latency_seconds: 5
+
+# ------------------------------------------------------------
+# 告警阈值（工艺安全侧仅供参考——安全联锁永远走DCS硬回路，见4.2.6红线）
+# ------------------------------------------------------------
+alarm:
+  # ⚠️ 以下阈值仅用于AI侧提示/驾驶舱展示，不作为联锁依据
+  collector_pressure_high: 250.0     # 集气管压力高限提示 (Pa)
+  gas_pressure_low: 500.0            # 煤气压力低限提示 (Pa)
+  flue_suction_low: 80.0             # 分烟道吸力低限提示 (Pa)
+  oxygen_content_low: 4.0            # 残氧过低提示 (%)
+  oxygen_content_high: 9.0           # 残氧过高提示 (%)
+  bearing_temp_warn: 75.0            # 轴承温度预警 (℃)
+  bearing_temp_alarm: 90.0           # 轴承温度报警 (℃)
+  # 振动速度分级参考 ISO 10816（见4.3.3）
+  vibration_zone_bc: 4.5             # B/C区界限 (mm/s)
+  vibration_zone_cd: 7.1             # C/D区界限 (mm/s)
+  fire_channel_temp_high: 1350.0     # 火道温度高限提示 (℃)
+  fire_channel_temp_low: 1100.0      # 火道温度低限提示 (℃)
+
+# ------------------------------------------------------------
+# 热工K系数考核口径（4.2.6：驾驶舱与加热控制统一口径）
+# ------------------------------------------------------------
+k_coefficients:
+  temp_qualified_tolerance: 7.0      # 直行温度合格偏差 ±℃（K均）
+  k_an_shift_tolerance: 5.0          # 相邻班次标准温度波动合格率判定偏差 ±℃（K安）
+  coking_time_plan_tolerance_min: 10 # 计划结焦时间符合判定容差（K1，分钟）
+  push_time_plan_tolerance_min: 5    # 实际推焦时间符合判定容差（K2，分钟）
+
+# ------------------------------------------------------------
+# 模型管理与调度
+# ------------------------------------------------------------
+mlflow:
+  tracking_uri_env: "MLFLOW_TRACKING_URI"
+model:
+  dir_env: "MODEL_DIR"               # ./data/models
+scheduler:
+  timezone: "Asia/Shanghai"

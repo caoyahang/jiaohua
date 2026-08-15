@@ -1,0 +1,196 @@
+# ============================================================
+# DCS标签映射表
+# 依据：《AI焦化厂智能化落地方案 V1.1》3.2.2接口技术规格书 + 4.2.5采集清单
+# 说明：本文件是采集程序与DCS/MES招标书共用的点位字典，
+#       node_id 必须与实际DCS OPC UA地址空间逐点核对。
+# ============================================================
+
+# ------------------------------------------------------------
+# OPC UA 点位（DCS/PLC，强制协议 opc.tcp，见3.2.1）
+# ------------------------------------------------------------
+opc_ua_server:
+  protocol: "opc.tcp"
+  port: 4840
+  security_mode: "SignAndEncrypt"
+  authentication: "Username/Password or Certificate"
+  history_read: true
+  history_depth: "30 days minimum"
+  # 焦炉数量按实际配置扩充；以下以1#焦炉为例，2#焦炉同构
+  node_address_space:
+    # ---- 火道温度（机侧/焦侧，核心控制变量，1s~1min）----
+    - node_id: "ns=2;s=Furnace1.Burner.MachineSide.Temp"
+      description: "1#焦炉机侧火道温度"
+      data_type: "Float"
+      unit: "℃"
+      sampling_rate: "1000ms"
+    - node_id: "ns=2;s=Furnace1.Burner.CokeSide.Temp"
+      description: "1#焦炉焦侧火道温度"
+      data_type: "Float"
+      unit: "℃"
+      sampling_rate: "1000ms"
+    # ---- 煤气流量（控制执行变量，30s）----
+    - node_id: "ns=2;s=Furnace1.Gas.MachineSide.Flow"
+      description: "1#焦炉机侧煤气流量"
+      data_type: "Float"
+      unit: "m³/h"
+      sampling_rate: "30000ms"
+    - node_id: "ns=2;s=Furnace1.Gas.CokeSide.Flow"
+      description: "1#焦炉焦侧煤气流量"
+      data_type: "Float"
+      unit: "m³/h"
+      sampling_rate: "30000ms"
+    # ---- 分烟道吸力（控制执行变量，30s）----
+    - node_id: "ns=2;s=Furnace1.Flue.MachineSide.Suction"
+      description: "1#焦炉机侧分烟道吸力"
+      data_type: "Float"
+      unit: "Pa"
+      sampling_rate: "30000ms"
+    - node_id: "ns=2;s=Furnace1.Flue.CokeSide.Suction"
+      description: "1#焦炉焦侧分烟道吸力"
+      data_type: "Float"
+      unit: "Pa"
+      sampling_rate: "30000ms"
+    # ---- 集气管压力（安全约束，10s）----
+    - node_id: "ns=2;s=Furnace1.Collector.MachineSide.Pressure"
+      description: "1#焦炉机侧集气管压力"
+      data_type: "Float"
+      unit: "Pa"
+      sampling_rate: "10000ms"
+    - node_id: "ns=2;s=Furnace1.Collector.CokeSide.Pressure"
+      description: "1#焦炉焦侧集气管压力"
+      data_type: "Float"
+      unit: "Pa"
+      sampling_rate: "10000ms"
+    # ---- 烟气残氧（燃烧效率优化，1min）----
+    - node_id: "ns=2;s=Furnace1.Flue.Oxygen"
+      description: "1#焦炉总烟道烟气残氧"
+      data_type: "Float"
+      unit: "%"
+      sampling_rate: "60000ms"
+    # ---- 氨水流量 ----
+    - node_id: "ns=2;s=Furnace1.Ammonia.Flow"
+      description: "1#焦炉桥管氨水流量"
+      data_type: "Float"
+      unit: "t/h"
+      sampling_rate: "30000ms"
+    # ---- 煤气热值（热值波动补偿，可选，5min）----
+    - node_id: "ns=2;s=Furnace1.Gas.CalorificValue"
+      description: "1#焦炉煤气热值"
+      data_type: "Float"
+      unit: "kJ/m³"
+      sampling_rate: "300000ms"
+    # ---- 换向机构状态（换向期数据剔除的事件源，V1.1红线）----
+    - node_id: "ns=2;s=Furnace1.Reversal.Status"
+      description: "1#焦炉换向机构状态(0=正常,1=换向中)"
+      data_type: "Int32"
+      unit: "-"
+      sampling_rate: "1000ms"
+      tag_key: "reversal_status"    # 对应 settings.yaml 的 reversal_exclusion.event_tag
+
+# ------------------------------------------------------------
+# Modbus TCP 点位（设备状态：电机电流/轴承温度/振动，≤10s）
+# 寄存器地址为示例，须与设备点表核对
+# ------------------------------------------------------------
+modbus_devices:
+  - device_id: 101
+    equipment_name: "1#推焦车走行电机"
+    workshop: "焦炉"
+    priority: "P0"                  # 见4.3.1监控对象优先级
+    protocol: "modbus_tcp"
+    poll_interval_ms: 10000
+    registers:
+      - address: 40001
+        name: "motor_current"
+        description: "电机电流"
+        data_type: "Float32"
+        unit: "A"
+        scale: 0.1
+      - address: 40003
+        name: "bearing_temp"
+        description: "轴承温度"
+        data_type: "Float32"
+        unit: "℃"
+        scale: 0.1
+      - address: 40005
+        name: "vibration_speed"
+        description: "振动速度"
+        data_type: "Float32"
+        unit: "mm/s"
+        scale: 0.01
+  - device_id: 102
+    equipment_name: "1#拦焦车导焦栅驱动电机"
+    workshop: "焦炉"
+    priority: "P0"
+    protocol: "modbus_tcp"
+    poll_interval_ms: 10000
+    registers:
+      - address: 40001
+        name: "motor_current"
+        description: "电机电流"
+        data_type: "Float32"
+        unit: "A"
+        scale: 0.1
+      - address: 40003
+        name: "bearing_temp"
+        description: "轴承温度"
+        data_type: "Float32"
+        unit: "℃"
+        scale: 0.1
+      - address: 40005
+        name: "vibration_speed"
+        description: "振动速度"
+        data_type: "Float32"
+        unit: "mm/s"
+        scale: 0.01
+  - device_id: 201
+    equipment_name: "煤气鼓风机"
+    workshop: "化产"
+    priority: "P1"
+    protocol: "modbus_tcp"
+    poll_interval_ms: 10000
+    registers:
+      - address: 40001
+        name: "motor_current"
+        description: "电机电流"
+        data_type: "Float32"
+        unit: "A"
+        scale: 0.1
+      - address: 40003
+        name: "bearing_temp"
+        description: "轴承温度"
+        data_type: "Float32"
+        unit: "℃"
+        scale: 0.1
+      - address: 40005
+        name: "vibration_speed"
+        description: "振动速度"
+        data_type: "Float32"
+        unit: "mm/s"
+        scale: 0.01
+      - address: 40007
+        name: "oil_temp"
+        description: "油温"
+        data_type: "Float32"
+        unit: "℃"
+        scale: 0.1
+
+# ------------------------------------------------------------
+# RTSP 视频流（视频监控系统，见3.2.1；地址从环境变量读取）
+# ------------------------------------------------------------
+rtsp_cameras:
+  - camera_id: "CAM_TOP_F1"
+    description: "1#焦炉炉顶"
+    scene: "furnace_top"
+    url_env: "RTSP_URL_CAM_TOP_F1"
+  - camera_id: "CAM_BASEMENT_F1"
+    description: "1#焦炉地下室（烟火识别）"
+    scene: "furnace_basement"
+    url_env: "RTSP_URL_CAM_BASEMENT_F1"
+  - camera_id: "CAM_BELT_1"
+    description: "1#皮带走廊（安全帽/反光衣/闯入）"
+    scene: "belt_corridor"
+    url_env: "RTSP_URL_CAM_BELT_1"
+  - camera_id: "CAM_GAS_HOLDER"
+    description: "煤气柜区"
+    scene: "gas_holder"
+    url_env: "RTSP_URL_CAM_GAS_HOLDER"

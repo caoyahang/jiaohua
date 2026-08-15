@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pytest:*)",
+      "Bash(python -m py_compile:*)",
+      "Bash(python -c:*)",
+      "Bash(find:*)",
+      "Bash(docker compose ps)",
+      "Bash(docker compose logs:*)",
+      "Bash(curl -s http://localhost:8000/health)"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(git push:*)",
+      "Bash(git reset:*)",
+      "Read(./.env)"
+    ]
+  }
+}

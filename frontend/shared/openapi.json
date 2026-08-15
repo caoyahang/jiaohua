@@ -1,0 +1,1039 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "AI焦化厂智能化平台 API",
+    "description": "智能配煤 / 焦炉加热控制 / 设备PdM / 安全视觉 四大应用后端",
+    "version": "1.1.0"
+  },
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "认证"
+        ],
+        "summary": "登录签发token",
+        "description": "校验账号密码，签发JWT。失败统一返回401，不区分用户不存在/密码错误。",
+        "operationId": "login_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/blend/optimize": {
+      "post": {
+        "tags": [
+          "智能配煤"
+        ],
+        "summary": "调配煤优化器",
+        "description": "运行配煤优化：GA(scikit-opt)寻优 + 质量预测模型(LightGBM)评估 + SHAP解释。\n\n返回3套方案：cost_optimal / quality_stable / balanced（4.1.5输出规范）。\n优化器本体在 models/blending_optimizer/，此处只做参数校验与调用编排。",
+        "operationId": "optimize_blend_optimize_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OptimizeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/blend/recipes": {
+      "get": {
+        "tags": [
+          "智能配煤"
+        ],
+        "summary": "历史配煤方案查询",
+        "description": "查询PostgreSQL blend_recipe表（3.4.1节），支持按焦炉号过滤。",
+        "operationId": "list_recipes_blend_recipes_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "furnace_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Furnace Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/blend/feedback": {
+      "post": {
+        "tags": [
+          "智能配煤"
+        ],
+        "summary": "化验结果回流，触发增量学习",
+        "description": "化验数据闭环（4.1.7节）：\n\n1. 取该批次当时的预测值 → 2. 计算误差 → 3. 超阈值写入误差缓冲区(Redis)\n→ 4. 缓冲区满 BUFFER_TRIGGER_SIZE 条触发增量微调（LightGBM热启动，小学习率防遗忘）。",
+        "operationId": "feedback_blend_feedback_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabFeedback"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/furnace/temp": {
+      "get": {
+        "tags": [
+          "焦炉加热控制"
+        ],
+        "summary": "实时炉温",
+        "description": "查询TDengine中该焦炉最近一次的机/焦侧火道温度。\n\n注意：换向前后2~3分钟数据为脏数据（4.2.6节），\n由ETL管道打标记，此处查询应过滤 switching_flag=0。",
+        "operationId": "get_temp_furnace_temp_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "furnace_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Furnace Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/furnace/ai-setpoint": {
+      "get": {
+        "tags": [
+          "焦炉加热控制"
+        ],
+        "summary": "AI设定值建议",
+        "description": "MPC求解最优煤气流量/吸力设定值（4.2.4节），输出前经 clamp_setpoint 钳位。\n\nshadow模式下仅展示不下发；auto模式由控制回路消费本接口结果。",
+        "operationId": "get_ai_setpoint_furnace_ai_setpoint_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "furnace_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Furnace Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/furnace/control-mode": {
+      "post": {
+        "tags": [
+          "焦炉加热控制"
+        ],
+        "summary": "切换控制模式",
+        "description": "切换 manual/shadow/auto。\n\n状态存Redis（key: furnace:control_mode:{furnace_id}），Redis不可用时落内存。\n注意：「一键切手动」为DCS硬切换（4.2.6节），本接口只是AI系统侧的模式记录，\n不构成安全通路。",
+        "operationId": "set_control_mode_furnace_control_mode_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ControlModeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/furnace/k-coefficients": {
+      "get": {
+        "tags": [
+          "焦炉加热控制"
+        ],
+        "summary": "热工K系数查询",
+        "description": "返回K均/K安/K1/K2/K3（4.2.6节统一考核口径）。\n\n计算逻辑在 data/pipeline/k_coefficients.py（直行温度记录+推焦计划/执行记录），\n本接口只做查询编排。",
+        "operationId": "get_k_coefficients_furnace_k_coefficients_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "furnace_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Furnace Id"
+            }
+          },
+          {
+            "name": "shift_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Shift Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pdm/devices": {
+      "get": {
+        "tags": [
+          "设备PdM"
+        ],
+        "summary": "监控设备列表",
+        "description": "返回监控设备清单，支持按优先级P0/P1/P2过滤。",
+        "operationId": "list_devices_pdm_devices_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "priority",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^P[012]$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Priority"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pdm/devices/{device_id}/health": {
+      "get": {
+        "tags": [
+          "设备PdM"
+        ],
+        "summary": "设备健康评分",
+        "description": "综合健康评分（0~100）：孤立森林异常分 + LSTM趋势外推 + ISO 10816振动分级。\n\n模型在 models/pdm/（anomaly_detect/trend_forecast），此处做调用编排。",
+        "operationId": "get_health_pdm_devices__device_id__health_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Device Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pdm/alarms": {
+      "get": {
+        "tags": [
+          "设备PdM"
+        ],
+        "summary": "PdM告警列表",
+        "description": "查询两级预警告警（4.3.2节：level1实时异常 / level2趋势+ISO10816分级）。",
+        "operationId": "list_alarms_pdm_alarms_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "level",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(WARNING|DANGER)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Level"
+            }
+          },
+          {
+            "name": "device_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Device Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/vision/alarms": {
+      "get": {
+        "tags": [
+          "安全视觉"
+        ],
+        "summary": "视觉告警列表",
+        "description": "查询视觉告警，支持按场景/确认状态过滤，按时间倒序。",
+        "operationId": "list_alarms_vision_alarms_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scene",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "场景过滤: helmet/fire_smoke/intrusion/gas_leak/meter_reading/coke_maturity",
+              "title": "Scene"
+            },
+            "description": "场景过滤: helmet/fire_smoke/intrusion/gas_leak/meter_reading/coke_maturity"
+          },
+          {
+            "name": "acked",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "是否已确认",
+              "title": "Acked"
+            },
+            "description": "是否已确认"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/vision/alarms/{alarm_id}/ack": {
+      "post": {
+        "tags": [
+          "安全视觉"
+        ],
+        "summary": "视觉告警确认",
+        "description": "确认告警：记录处理人与处置意见；误报标记回流训练集迭代（每周重训消费）。",
+        "operationId": "ack_alarm_vision_alarms__alarm_id__ack_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "alarm_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Alarm Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AckRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "健康检查",
+        "description": "健康检查：自身存活 + 依赖（PostgreSQL/Redis/TDengine）连通性。\n\n依赖不可达时返回 degraded 而非 500，便于负载均衡探活与运维定位。",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AckRequest": {
+        "properties": {
+          "handler": {
+            "type": "string",
+            "title": "Handler",
+            "description": "处理人"
+          },
+          "comment": {
+            "type": "string",
+            "title": "Comment",
+            "description": "处置意见",
+            "default": ""
+          },
+          "is_false_positive": {
+            "type": "boolean",
+            "title": "Is False Positive",
+            "description": "是否误报（回流用于模型迭代）",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "handler"
+        ],
+        "title": "AckRequest",
+        "description": "告警确认请求。"
+      },
+      "CoalInfo": {
+        "properties": {
+          "coal_id": {
+            "type": "integer",
+            "title": "Coal Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "stock_tons": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Stock Tons",
+            "description": "库存量 吨"
+          },
+          "price_per_ton": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Price Per Ton",
+            "description": "单价 元/吨"
+          },
+          "min_ratio": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Min Ratio",
+            "description": "配比下限（工艺约束）",
+            "default": 0.0
+          },
+          "max_ratio": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Max Ratio",
+            "description": "配比上限（工艺约束）",
+            "default": 1.0
+          },
+          "lab_data": {
+            "type": "object",
+            "title": "Lab Data",
+            "description": "化验指标：Ad/Vdaf/St_d/G/Y/Rmax等"
+          }
+        },
+        "type": "object",
+        "required": [
+          "coal_id",
+          "name",
+          "stock_tons",
+          "price_per_ton"
+        ],
+        "title": "CoalInfo",
+        "description": "可用煤种信息（含库存约束与化验指标）。"
+      },
+      "ControlModeRequest": {
+        "properties": {
+          "furnace_id": {
+            "type": "integer",
+            "title": "Furnace Id",
+            "description": "焦炉编号"
+          },
+          "mode": {
+            "type": "string",
+            "pattern": "^(manual|shadow|auto)$",
+            "title": "Mode"
+          },
+          "operator": {
+            "type": "string",
+            "title": "Operator",
+            "description": "操作人工号/姓名（审计用）"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "description": "切换原因",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "furnace_id",
+          "mode",
+          "operator"
+        ],
+        "title": "ControlModeRequest",
+        "description": "控制模式切换请求。"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LabFeedback": {
+        "properties": {
+          "batch_no": {
+            "type": "string",
+            "title": "Batch No",
+            "description": "配煤批次号"
+          },
+          "actual_quality": {
+            "type": "object",
+            "title": "Actual Quality",
+            "description": "实测焦炭质量：M25/M10/CSR/CRI"
+          }
+        },
+        "type": "object",
+        "required": [
+          "batch_no",
+          "actual_quality"
+        ],
+        "title": "LabFeedback",
+        "description": "化验结果回流（4.1.7增量学习入口）。"
+      },
+      "LoginRequest": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "LoginRequest",
+        "description": "登录请求体。"
+      },
+      "OptimizeRequest": {
+        "properties": {
+          "target_quality": {
+            "$ref": "#/components/schemas/TargetQuality"
+          },
+          "available_coals": {
+            "items": {
+              "$ref": "#/components/schemas/CoalInfo"
+            },
+            "type": "array",
+            "minItems": 2,
+            "title": "Available Coals"
+          },
+          "max_cost_per_ton": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Max Cost Per Ton",
+            "default": 1500.0
+          },
+          "priority": {
+            "type": "string",
+            "pattern": "^(cost|quality|balanced)$",
+            "title": "Priority",
+            "default": "cost"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_quality",
+          "available_coals"
+        ],
+        "title": "OptimizeRequest",
+        "description": "配煤优化请求（4.1.5输入JSON）。"
+      },
+      "TargetQuality": {
+        "properties": {
+          "M25_min": {
+            "type": "number",
+            "title": "M25 Min",
+            "description": "抗碎强度M25下限 %",
+            "default": 90.0
+          },
+          "M10_max": {
+            "type": "number",
+            "title": "M10 Max",
+            "description": "耐磨强度M10上限 %",
+            "default": 6.5
+          },
+          "CSR_min": {
+            "type": "number",
+            "title": "Csr Min",
+            "description": "反应后强度CSR下限 %",
+            "default": 65.0
+          },
+          "CRI_max": {
+            "type": "number",
+            "title": "Cri Max",
+            "description": "反应性CRI上限 %",
+            "default": 25.0
+          }
+        },
+        "type": "object",
+        "title": "TargetQuality",
+        "description": "目标焦炭质量指标。"
+      },
+      "TokenResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "expires_in"
+        ],
+        "title": "TokenResponse",
+        "description": "登录响应体。"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

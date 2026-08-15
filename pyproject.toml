@@ -1,0 +1,62 @@
+# AI焦化厂智能化平台 - 项目元数据与依赖唯一声明（SSOT，对应方案§6.1 技术栈）
+# 安装：pip install .          （生产依赖）
+#       pip install -e ".[dev]"（本地开发，含测试依赖）
+# 兼容入口：requirements.txt（= "."）、requirements-dev.txt（= ".[dev]"），
+#           供 Dockerfile/deploy.sh 等既有流程使用，改依赖只改本文件。
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jiaohua-platform"
+version = "0.1.0"
+description = "AI焦化厂智能化平台：智能配煤 / 焦炉加热控制 / 设备PdM / 安全视觉"
+requires-python = ">=3.11"
+dependencies = [
+    # ----- Web后端 -----
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "httpx",
+    # ----- 数据采集 -----
+    "asyncua",          # OPC UA客户端
+    "pymodbus",         # Modbus TCP客户端
+    # ----- 数据库 -----
+    "psycopg2-binary",  # PostgreSQL驱动
+    "asyncpg",          # PostgreSQL异步驱动（备用）
+    "redis",            # Redis客户端
+    "taospy",           # TDengine Python连接器
+    # ----- 数据处理 -----
+    "pandas",
+    "numpy",
+    "pyyaml",
+    # ----- 机器学习 -----
+    "scikit-learn",
+    "lightgbm",
+    "xgboost",
+    "shap",             # 模型可解释性
+    "matplotlib",       # SHAP/评估图表绘制
+    "opencv-python",    # 视觉AI图像处理
+    # ----- 深度学习 -----
+    "torch",            # PyTorch 2.x（LSTM/Transformer/CNN）
+    "ultralytics",      # YOLOv8目标检测
+    # ----- 优化算法 -----
+    "scikit-opt",       # 遗传算法/粒子群
+    "ortools",          # Google OR-Tools（CP-SAT排产）
+    # ----- 模型管理与部署 -----
+    "mlflow",           # 实验跟踪/模型注册
+    "onnxruntime",      # 推理加速
+    # ----- 任务调度 -----
+    "apscheduler",
+    "celery",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
+[tool.setuptools.packages.find]
+include = ["services*", "data*", "models*"]
+exclude = ["tests*", "frontend*"]

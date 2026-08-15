@@ -1,0 +1,35 @@
+# Prometheus 抓取配置 —— AI焦化厂智能化平台
+# 挂载路径（见 docker-compose.yml）：/etc/prometheus/prometheus.yml
+# 目标服务名为 docker-compose 中的服务名，容器网络内解析。
+
+global:
+  scrape_interval: 15s      # 全局抓取间隔
+  evaluation_interval: 15s  # 告警规则评估间隔
+
+# 告警规则（后续补充，如数据在线率、采集延迟、模型漂移指标）
+# rule_files:
+#   - "alerts.yml"
+
+scrape_configs:
+  # FastAPI 后端服务指标（请求量/延迟/模型推理耗时）
+  - job_name: "api"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["api:8000"]
+        labels:
+          service: "fastapi-backend"
+
+  # 数据采集服务指标（采集延迟/在线率/点位失败数）
+  - job_name: "collector"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["collector:9100"]
+        labels:
+          service: "data-collector"
+
+  # Prometheus 自监控
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+# TODO: 按需追加 TDengine/PostgreSQL/Redis exporter 及节点 exporter 抓取配置

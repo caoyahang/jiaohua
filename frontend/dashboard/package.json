@@ -1,0 +1,42 @@
+{
+  "name": "dashboard",
+  "private": true,
+  "version": "0.1.0",
+  "description": "领导驾驶舱——全厂 KPI 一屏深色大屏（焦化厂智能化平台）",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "gen:api": "openapi-typescript ../shared/openapi.json -o src/api/schema.d.ts",
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^5.5.1",
+    "ahooks": "^3.8.1",
+    "antd": "^5.21.0",
+    "echarts": "^5.5.1",
+    "echarts-for-react": "^3.0.2",
+    "overlayscrollbars": "^2.10.0",
+    "overlayscrollbars-react": "^0.5.6",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2",
+    "styled-components": "^6.1.13",
+    "zustand": "^4.5.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.47.2",
+    "@types/react": "^18.3.8",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.20",
+    "openapi-typescript": "^7.4.0",
+    "postcss": "^8.4.47",
+    "sass": "^1.79.3",
+    "tailwindcss": "^3.4.12",
+    "typescript": "^5.6.2",
+    "vite": "^5.4.8"
+  }
+}
