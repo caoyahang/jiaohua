@@ -265,35 +265,35 @@ K均目标 ≥ 0.90（V1.1 §10.1），K3 目标 ≥ 0.95（V1.1 §4.5.1）。
 
 ### GET /pdm/devices
 
-查询设备台账与健康状态（P0/P1/P2 分级，V1.1 §4.3.1）。
+查询监控设备清单（P0/P1/P2 分级，V1.1 §4.3.1）。
 
-**查询参数**：`priority`（`P0`/`P1`/`P2`）、`workshop`、`status`
+> 实现现状（2026-08-15）：设备台账表未建，当前为内存注册表（`services/api/routes/pdm.py` DEVICE_REGISTRY），
+> 只回注册信息；`workshop`/`status`/健康/振动等运行字段待设备台账与健康评分链路接入后提供。
+> 台账落库后 `device_id` 将切换为整型主键（届时同步修订本契约）。
+
+**查询参数**：`priority`（`P0`/`P1`/`P2`）
 
 **响应**
 
 ```json
 {
-  "items": [
+  "devices": [
     {
-      "equipment_id": 101,
-      "equipment_name": "1#推焦车走行机构",
+      "device_id": "pusher_travel",
+      "name": "推焦车走行机构",
       "priority": "P0",
-      "status": "running",
-      "health_score": 86.5,
-      "vibration_speed": 3.2,
-      "vibration_zone": "注意",
-      "bearing_temp": 62.0,
-      "last_maintenance_date": "2026-06-15"
+      "sensors": ["vibration", "current", "temperature"]
     }
-  ]
+  ],
+  "total": 7
 }
 ```
-
-`vibration_zone` 按 ISO 10816 分级：良好 / 注意 / 不合格 / 危险。RUL 字段后置（V1.1：故障样本 ≥50 例再立项）。
 
 ### GET /pdm/devices/{device_id}/health
 
 查询单台设备的健康评分明细（振动/温度/电流分项得分与趋势）。
+
+> 实现现状（2026-08-15）：恒 503（健康评分模型未部署）；以下为目标契约。
 
 **响应**
 
@@ -308,9 +308,10 @@ K均目标 ≥ 0.90（V1.1 §10.1），K3 目标 ≥ 0.95（V1.1 §4.5.1）。
 
 ### GET /pdm/alarms
 
-查询 PdM 两级预警告警（第一级实时异常 / 第二级趋势分级）。
+查询 PdM 两级预警告警（V1.1 §4.3.2：`level` 为严重度，两级分类在 `source` 字段：
+`level1_anomaly` 实时异常 / `level2_trend_forecast` 趋势分级）。
 
-**查询参数**：`equipment_id`、`level`（`WARNING`/`DANGER`）、`date_from`、`date_to`、`acknowledged`
+**查询参数**：`equipment_id`(int)、`level`（`WARNING`/`DANGER`）、`date_from`、`date_to`、`acknowledged`、`limit`(默认50)
 
 **响应**
 
@@ -329,6 +330,8 @@ K均目标 ≥ 0.90（V1.1 §10.1），K3 目标 ≥ 0.95（V1.1 §4.5.1）。
   ]
 }
 ```
+
+响应项另透传详情字段：`metric` / `metric_value` / `threshold` / `iso10816_zone` / `handler` / `ack_comment` / `acked_at`（均可空）。
 
 ---
 
@@ -360,6 +363,24 @@ K均目标 ≥ 0.90（V1.1 §10.1），K3 目标 ≥ 0.95（V1.1 §4.5.1）。
 ```
 
 响应要求：识别到告警端到端 < 5 秒（V1.1 §10.1）。
+响应项另透传详情字段：`label`（检测类别，scene 的细粒度补充）/ `level` / `msg` / `is_false_positive`（均可空）。
+
+### POST /vision/alarms/{alarm_id}/ack
+
+告警确认：记录处理人与处置意见；误报标记回流训练集迭代（V1.1 §4.4.1 每周重训消费）。
+重复确认或告警不存在返回 404。
+
+**请求体**
+
+```json
+{"handler": "张三", "comment": "已现场核实", "is_false_positive": false}
+```
+
+**响应**
+
+```json
+{"alarm_id": 9001, "status": "acked"}
+```
 
 ---
 
@@ -369,3 +390,11 @@ K均目标 ≥ 0.90（V1.1 §10.1），K3 目标 ≥ 0.95（V1.1 §4.5.1）。
 
 Prometheus 抓取端点（无需认证，仅容器网络内开放），配置见 `monitoring/prometheus/prometheus.yml`。
 暴露：API 请求量/延迟、模型推理耗时、配煤求解耗时、PdM/vision 告警计数等自定义指标。
+
+---
+
+## 变更记录
+
+| 日期 | 变更 | 对应代码路径 |
+|---|---|---|
+| 2026-08-15 | §5 告警接口对齐实现：`/pdm/alarms` 补 limit 参数与透传字段、明确 level/source 口径；`/vision/alarms` 补透传字段、新增 ack 小节；`/pdm/devices` 改为与代码一致的内存注册表现状（标注台账落库后切换整型主键）；`/pdm/devices/{id}/health` 标注 503 未部署 | `services/api/routes/pdm.py`、`services/api/routes/vision.py` |

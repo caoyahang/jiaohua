@@ -5,7 +5,8 @@
  * PdM 后端现状（services/api/routes/pdm.py）：
  * - /pdm/devices 真实可用但只回注册信息 → 运行字段 mock 补齐，结果恒挂 __mock
  * - /pdm/devices/{id}/health 恒 503 → client 自动降级 mock
- * - /pdm/alarms 回 200 空占位（detail 含「待建」）→ 本文件识别后主动降级 mock
+ * - /pdm/alarms 真实查询 pdm_alarm 表（契约见 docs/API文档.md §5）；
+ *   503/断网由 client 自动降级 mock
  * - PdM 无 ack 接口：告警确认为前端本地状态，见 stores/alarmAck.ts
  */
 import { request, ApiError, BackendUnreachableError } from './client';
@@ -16,7 +17,6 @@ import type {
   DeviceRow,
   DevicesResponse,
   HealthResponse,
-  PdmAlarm,
   TokenResponse,
 } from './types';
 
@@ -99,31 +99,22 @@ export function getDeviceHealth(
 }
 
 /**
- * PdM 告警（GET /pdm/alarms）。
- * 后端真实可用但返回空占位（alarms 为空且 detail 含「待建」），
- * 识别该占位特征后主动降级 mock；503/断网由 client 自动降级。
+ * PdM 告警（GET /pdm/alarms）：真实查询 pdm_alarm 表。
+ * 旧参数 device_id(string) 已改为 equipment_id(int，设备主键）；
+ * 503/断网由 client 自动降级 mock（mock 形状与契约一致）。
  */
-export async function listAlarms(
+export function listAlarms(
   level?: 'WARNING' | 'DANGER',
-  deviceId?: string,
-): Promise<{ alarms: PdmAlarm[]; __mock?: true }> {
-  const resp = await request<AlarmsResponse>(
+  equipmentId?: number,
+): Promise<AlarmsResponse & { __mock?: true }> {
+  return request<AlarmsResponse>(
     '/pdm/alarms',
-    { method: 'GET', query: { level, device_id: deviceId } },
+    { method: 'GET', query: { level, equipment_id: equipmentId } },
     () => {
-      let alarms = mockAlarms().alarms;
-      if (level) alarms = alarms.filter((a) => a.level === level);
-      if (deviceId) alarms = alarms.filter((a) => a.equipment_id === deviceId);
-      return { alarms };
+      let items = mockAlarms().items;
+      if (level) items = items.filter((a) => a.level === level);
+      if (equipmentId !== undefined) items = items.filter((a) => a.equipment_id === equipmentId);
+      return { items };
     },
   );
-  if (resp.__mock) return resp;
-  // 200 空占位：告警表待建（依赖数据底座）→ 降级 mock
-  if (resp.alarms.length === 0 && (resp.detail ?? '').includes('待建')) {
-    let alarms = mockAlarms().alarms;
-    if (level) alarms = alarms.filter((a) => a.level === level);
-    if (deviceId) alarms = alarms.filter((a) => a.equipment_id === deviceId);
-    return { alarms, __mock: true };
-  }
-  return { alarms: resp.alarms };
 }

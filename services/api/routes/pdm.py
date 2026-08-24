@@ -8,10 +8,12 @@
 """
 
 import logging
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from services.api.core.security import get_current_user
+from services.api.db.connections import get_pg_conn
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/pdm", tags=["设备PdM"])
@@ -59,12 +61,75 @@ def get_health(device_id: str, user: str = Depends(get_current_user)):
 
 @router.get("/alarms", summary="PdM告警列表")
 def list_alarms(
+    equipment_id: int | None = None,
     level: str | None = Query(None, pattern="^(WARNING|DANGER)$"),
-    device_id: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    acknowledged: bool | None = None,
     limit: int = 50,
     user: str = Depends(get_current_user),
 ):
-    """查询两级预警告警（4.3.2节：level1实时异常 / level2趋势+ISO10816分级）。"""
-    # TODO: 从PostgreSQL pdm_alarm表查询，支持level/device_id过滤、按时间倒序
-    logger.info("查询PdM告警: level=%s device=%s user=%s", level, device_id, user)
-    return {"alarms": [], "detail": "告警表待建（依赖数据底座）"}
+    """查询两级预警告警（4.3.2节），响应契约见 docs/API文档.md §5。
+
+    数据源：PostgreSQL pdm_alarm 表（方案§3.4.6）；level 为严重度，
+    两级分类在 source 字段（level1_anomaly 实时异常 / level2_trend_forecast 趋势分级）。
+    """
+    import psycopg2.extras  # noqa: PLC0415
+
+    conn = get_pg_conn()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            sql = (
+                "SELECT id, equipment_id, level, source, metric, metric_value,"
+                " threshold, iso10816_zone, message, acknowledged, handler,"
+                " ack_comment, acked_at, created_at FROM pdm_alarm"
+            )
+            clauses: list[str] = []
+            params: list = []
+            if equipment_id is not None:
+                clauses.append("equipment_id = %s")
+                params.append(equipment_id)
+            if level:
+                clauses.append("level = %s")
+                params.append(level)
+            if date_from:
+                clauses.append("created_at >= %s")
+                params.append(date_from)
+            if date_to:
+                # date_to 当日闭区间：< 次日零点的写法避免漏掉当天尾盘告警
+                clauses.append("created_at < %s::date + 1")
+                params.append(date_to)
+            if acknowledged is not None:
+                clauses.append("acknowledged = %s")
+                params.append(acknowledged)
+            if clauses:
+                sql += " WHERE " + " AND ".join(clauses)
+            sql += " ORDER BY created_at DESC LIMIT %s"
+            params.append(limit)
+            cur.execute(sql, params)
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+    logger.info("查询PdM告警: equipment=%s level=%s 命中=%d user=%s",
+                equipment_id, level, len(rows), user)
+    return {"items": [_to_alarm_item(r) for r in rows]}
+
+
+def _to_alarm_item(r: dict) -> dict:
+    """pdm_alarm 行 → API文档§5 响应项（额外字段为前端详情页透传）。"""
+    return {
+        "alarm_id": r["id"],
+        "equipment_id": r["equipment_id"],
+        "level": r["level"],
+        "source": r["source"],
+        "metric": r["metric"],
+        "metric_value": r["metric_value"],
+        "threshold": r["threshold"],
+        "iso10816_zone": r["iso10816_zone"],
+        "msg": r["message"],
+        "acknowledged": r["acknowledged"],
+        "handler": r["handler"],
+        "ack_comment": r["ack_comment"],
+        "acked_at": r["acked_at"].isoformat() if r["acked_at"] else None,
+        "ts": r["created_at"].isoformat(),
+    }

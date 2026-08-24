@@ -37,46 +37,60 @@ export interface KCoefficientsResponse {
   coefficients: KCoefficientRow[];
 }
 
-// ---------- 安全视觉告警（GET /vision/alarms，占位 200 空表 → 识别降级 mock） ----------
+// ---------- 安全视觉告警（GET /vision/alarms 真实查询 vision_alarm 表，503/断网降级 mock） ----------
 
-/** 告警场景（方案§4.4.1，大屏只展示前四类人员/安全场景） */
-export type VisionScene = 'helmet' | 'fire_smoke' | 'intrusion' | 'gas_leak';
+/** 告警场景（docs/API文档.md §5 取值口径，方案§4.4.1） */
+export type VisionScene = 'helmet' | 'fire' | 'intrusion' | 'gas_leak' | 'gauge' | 'coke_cake';
 
 export interface VisionAlarm {
   alarm_id: number;
   scene: VisionScene;
-  /** 区域（如 1#焦炉炉顶） */
-  area: string;
+  /** 区域（如 焦炉炉顶），可空 */
+  area: string | null;
   camera_id: string;
-  /** 置信度 0~1 */
-  confidence: number;
+  /** 检测类别（scene 的细粒度补充，如 flame/smoke），可空 */
+  label: string | null;
+  /** 置信度 0~1，可空 */
+  confidence: number | null;
+  /** 告警级别，可空 */
+  level: string | null;
+  msg: string | null;
+  snapshot_url: string | null;
+  acknowledged: boolean;
+  /** 误报标记（回流训练集迭代） */
+  is_false_positive: boolean;
   /** 告警时间 ISO 字符串 */
   ts: string;
-  acknowledged: boolean;
 }
 
 export interface VisionAlarmsResponse {
-  alarms: VisionAlarm[];
-  /** 后端占位响应带 detail 提示（如「告警表待建」），用于识别降级 */
-  detail?: string;
+  items: VisionAlarm[];
 }
 
-// ---------- PdM 告警（GET /pdm/alarms，占位 200 空表 → 识别降级 mock） ----------
+// ---------- PdM 告警（GET /pdm/alarms 真实查询 pdm_alarm 表，503/断网降级 mock） ----------
 
 export type PdmLevel = 'WARNING' | 'DANGER';
 
 export interface PdmAlarm {
   alarm_id: number;
-  equipment_id: string;
+  /** 设备主键（pdm_alarm.equipment_id，int） */
+  equipment_id: number;
   level: PdmLevel;
-  msg: string;
+  source: 'level1_anomaly' | 'level2_trend_forecast';
+  metric: string | null;
+  metric_value: number | null;
+  threshold: number | null;
+  iso10816_zone: string | null;
+  msg: string | null;
   ts: string;
   acknowledged: boolean;
+  handler: string | null;
+  ack_comment: string | null;
+  acked_at: string | null;
 }
 
 export interface PdmAlarmsResponse {
-  alarms: PdmAlarm[];
-  detail?: string;
+  items: PdmAlarm[];
 }
 
 // ---------- 全厂汇总 KPI（后端尚无聚合接口 → 固定 mock，角标常显） ----------
@@ -109,4 +123,40 @@ export interface QualityBatch {
 
 export interface QualityBoardResponse {
   batches: QualityBatch[];
+}
+
+// ---------- 实时炉温（GET /furnace/temp，后端恒 503 → 必走 mock） ----------
+// 字段口径与 furnace_ui 手写类型一致（TDengine furnace_temp 表，方案§3.4.3），
+// 待后端补 response_model 后统一改从 schema 引入。
+
+/** 燃烧侧：机侧 / 焦侧 */
+export type BurnerSide = 'machine' | 'coke';
+
+/** 控制模式三态（方案§4.2.2：manual 人工 / shadow 影子 / auto 自动） */
+export type ControlMode = 'manual' | 'shadow' | 'auto';
+
+/** GET /furnace/temp 时序点（TDengine furnace_temp 表字段口径，方案§3.4.3） */
+export interface TempPoint {
+  /** 采样时间 ISO 字符串 */
+  ts: string;
+  burner_side: BurnerSide;
+  /** 火道温度 ℃ */
+  fire_channel_temp: number;
+  /** 煤气流量 m³/h */
+  gas_flow: number;
+  /** 烟道吸力 Pa */
+  flue_suction: number;
+  /** 集气管压力 Pa */
+  collector_pressure: number;
+  /** 废气残氧 % */
+  oxygen_content: number;
+  control_mode: ControlMode;
+  /** 换向期标记：换向前后 2~3 分钟脏数据，不考核（方案§4.2.6） */
+  switching: boolean;
+}
+
+/** GET /furnace/temp 响应（后端恒 503，前端必走 mock） */
+export interface FurnaceTempResponse {
+  furnace_id: number;
+  points: TempPoint[];
 }

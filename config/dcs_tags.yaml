@@ -17,69 +17,107 @@ opc_ua_server:
   history_depth: "30 days minimum"
   # 焦炉数量按实际配置扩充；以下以1#焦炉为例，2#焦炉同构
   node_address_space:
+    # 落库映射字段（2026-08-15 新增，采集→TDengine 用）：
+    #   tag_key     = furnace_temp 超级表列名（tdengine.sql）
+    #   furnace_id  = 焦炉编号；burner_side = machine/coke/common（炉级公共量）
+    #   子表名 = furnace{furnace_id}_{burner_side}
     # ---- 火道温度（机侧/焦侧，核心控制变量，1s~1min）----
     - node_id: "ns=2;s=Furnace1.Burner.MachineSide.Temp"
       description: "1#焦炉机侧火道温度"
       data_type: "Float"
       unit: "℃"
       sampling_rate: "1000ms"
+      tag_key: "fire_channel_temp"
+      furnace_id: 1
+      burner_side: "machine"
     - node_id: "ns=2;s=Furnace1.Burner.CokeSide.Temp"
       description: "1#焦炉焦侧火道温度"
       data_type: "Float"
       unit: "℃"
       sampling_rate: "1000ms"
+      tag_key: "fire_channel_temp"
+      furnace_id: 1
+      burner_side: "coke"
     # ---- 煤气流量（控制执行变量，30s）----
     - node_id: "ns=2;s=Furnace1.Gas.MachineSide.Flow"
       description: "1#焦炉机侧煤气流量"
       data_type: "Float"
       unit: "m³/h"
       sampling_rate: "30000ms"
+      tag_key: "gas_flow"
+      furnace_id: 1
+      burner_side: "machine"
     - node_id: "ns=2;s=Furnace1.Gas.CokeSide.Flow"
       description: "1#焦炉焦侧煤气流量"
       data_type: "Float"
       unit: "m³/h"
       sampling_rate: "30000ms"
+      tag_key: "gas_flow"
+      furnace_id: 1
+      burner_side: "coke"
     # ---- 分烟道吸力（控制执行变量，30s）----
     - node_id: "ns=2;s=Furnace1.Flue.MachineSide.Suction"
       description: "1#焦炉机侧分烟道吸力"
       data_type: "Float"
       unit: "Pa"
       sampling_rate: "30000ms"
+      tag_key: "flue_suction"
+      furnace_id: 1
+      burner_side: "machine"
     - node_id: "ns=2;s=Furnace1.Flue.CokeSide.Suction"
       description: "1#焦炉焦侧分烟道吸力"
       data_type: "Float"
       unit: "Pa"
       sampling_rate: "30000ms"
+      tag_key: "flue_suction"
+      furnace_id: 1
+      burner_side: "coke"
     # ---- 集气管压力（安全约束，10s）----
     - node_id: "ns=2;s=Furnace1.Collector.MachineSide.Pressure"
       description: "1#焦炉机侧集气管压力"
       data_type: "Float"
       unit: "Pa"
       sampling_rate: "10000ms"
+      tag_key: "collector_pressure"
+      furnace_id: 1
+      burner_side: "machine"
     - node_id: "ns=2;s=Furnace1.Collector.CokeSide.Pressure"
       description: "1#焦炉焦侧集气管压力"
       data_type: "Float"
       unit: "Pa"
       sampling_rate: "10000ms"
+      tag_key: "collector_pressure"
+      furnace_id: 1
+      burner_side: "coke"
     # ---- 烟气残氧（燃烧效率优化，1min）----
     - node_id: "ns=2;s=Furnace1.Flue.Oxygen"
       description: "1#焦炉总烟道烟气残氧"
       data_type: "Float"
       unit: "%"
       sampling_rate: "60000ms"
+      tag_key: "oxygen_content"
+      furnace_id: 1
+      burner_side: "common"
     # ---- 氨水流量 ----
     - node_id: "ns=2;s=Furnace1.Ammonia.Flow"
       description: "1#焦炉桥管氨水流量"
       data_type: "Float"
       unit: "t/h"
       sampling_rate: "30000ms"
+      tag_key: "ammonia_flow"
+      furnace_id: 1
+      burner_side: "common"
     # ---- 煤气热值（热值波动补偿，可选，5min）----
     - node_id: "ns=2;s=Furnace1.Gas.CalorificValue"
       description: "1#焦炉煤气热值"
       data_type: "Float"
       unit: "kJ/m³"
       sampling_rate: "300000ms"
+      tag_key: "coal_gas_calorific"
+      furnace_id: 1
+      burner_side: "common"
     # ---- 换向机构状态（换向期数据剔除的事件源，V1.1红线）----
+    # 事件点位：不入 furnace_temp（无对应列），由 ETL 管道消费做换向期标记
     - node_id: "ns=2;s=Furnace1.Reversal.Status"
       description: "1#焦炉换向机构状态(0=正常,1=换向中)"
       data_type: "Int32"

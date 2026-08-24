@@ -34,6 +34,9 @@ fi
 if grep -rn "services\.api\.auth" --include="*.py" services/ tests/ 2>/dev/null; then
     fail "出现旧路径 services.api.auth 引用"
 fi
+# 红线4：前端 base 颜色 token 四模块同源（frontend/AGENTS.md 红线4）
+python scripts/check_frontend_tokens.py || fail "前端 base colors 跨模块色值不一致"
+
 echo "红线 grep 通过"
 
 echo "===== 3/4 OpenAPI 契约新鲜度 ====="

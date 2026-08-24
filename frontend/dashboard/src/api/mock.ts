@@ -3,6 +3,8 @@
  * 响应结构以 services/api/routes/ 代码为准；后端补 response_model 后对齐 schema。
  */
 import type {
+  BurnerSide,
+  FurnaceTempResponse,
   KCoefficientRow,
   KCoefficientsResponse,
   OverviewKpi,
@@ -10,6 +12,7 @@ import type {
   PdmAlarmsResponse,
   QualityBatch,
   QualityBoardResponse,
+  TempPoint,
   VisionAlarm,
   VisionAlarmsResponse,
   VisionScene,
@@ -57,55 +60,73 @@ export function mockKCoefficients(furnaceId = 1): KCoefficientsResponse {
   return { coefficients: rows };
 }
 
-/** GET /vision/alarms 的 mock（占位空表/不可达时降级） */
+/** GET /vision/alarms 的 mock（503/断网时降级，形状与契约一致：items 数组） */
 export function mockVisionAlarms(): VisionAlarmsResponse {
-  const scenes: { scene: VisionScene; area: string; camera: string }[] = [
-    { scene: 'helmet', area: '1#焦炉炉顶', camera: 'CAM-A01' },
-    { scene: 'fire_smoke', area: '煤塔皮带廊', camera: 'CAM-B07' },
-    { scene: 'intrusion', area: '煤气净化车间', camera: 'CAM-C03' },
-    { scene: 'gas_leak', area: '鼓冷工段', camera: 'CAM-D02' },
-    { scene: 'helmet', area: '2#焦炉机侧', camera: 'CAM-A05' },
-    { scene: 'intrusion', area: '干熄焦提升井', camera: 'CAM-E01' },
-    { scene: 'fire_smoke', area: '备煤车间', camera: 'CAM-B02' },
-    { scene: 'helmet', area: '筛焦楼', camera: 'CAM-F04' },
-    { scene: 'gas_leak', area: '脱硫工序', camera: 'CAM-D06' },
-    { scene: 'intrusion', area: '1#焦炉焦侧', camera: 'CAM-A09' },
-    { scene: 'helmet', area: '装煤平台', camera: 'CAM-A12' },
-    { scene: 'fire_smoke', area: '运焦皮带', camera: 'CAM-B11' },
+  const scenes: { scene: VisionScene; area: string; camera: string; label: string }[] = [
+    { scene: 'helmet', area: '1#焦炉炉顶', camera: 'CAM-A01', label: 'no_helmet' },
+    { scene: 'fire', area: '煤塔皮带廊', camera: 'CAM-B07', label: 'smoke' },
+    { scene: 'intrusion', area: '煤气净化车间', camera: 'CAM-C03', label: 'person' },
+    { scene: 'gas_leak', area: '鼓冷工段', camera: 'CAM-D02', label: 'leak_cloud' },
+    { scene: 'helmet', area: '2#焦炉机侧', camera: 'CAM-A05', label: 'no_helmet' },
+    { scene: 'intrusion', area: '干熄焦提升井', camera: 'CAM-E01', label: 'person' },
+    { scene: 'fire', area: '备煤车间', camera: 'CAM-B02', label: 'flame' },
+    { scene: 'helmet', area: '筛焦楼', camera: 'CAM-F04', label: 'no_helmet' },
+    { scene: 'gas_leak', area: '脱硫工序', camera: 'CAM-D06', label: 'leak_cloud' },
+    { scene: 'intrusion', area: '1#焦炉焦侧', camera: 'CAM-A09', label: 'person' },
+    { scene: 'helmet', area: '装煤平台', camera: 'CAM-A12', label: 'no_helmet' },
+    { scene: 'fire', area: '运焦皮带', camera: 'CAM-B11', label: 'smoke' },
   ];
-  const alarms: VisionAlarm[] = scenes.map((s, i) => ({
+  const items: VisionAlarm[] = scenes.map((s, i) => ({
     alarm_id: 9001 + i,
     scene: s.scene,
     area: s.area,
     camera_id: s.camera,
+    label: s.label,
     confidence: Math.round((0.78 + ((i * 7) % 20) / 100) * 100) / 100,
+    level: s.scene === 'fire' || s.scene === 'gas_leak' ? 'DANGER' : 'WARNING',
+    msg: null,
+    snapshot_url: null,
     ts: tsStr(i * 47 + 15),
     // 前 5 条未确认，其余已确认
     acknowledged: i >= 5,
+    is_false_positive: false,
   }));
-  return { alarms };
+  return { items };
 }
 
-/** GET /pdm/alarms 的 mock（占位空表/不可达时降级） */
+/** GET /pdm/alarms 的 mock（503/断网时降级，形状与契约一致：items 数组） */
 export function mockPdmAlarms(): PdmAlarmsResponse {
-  const defs: { equipment_id: string; level: PdmAlarm['level']; msg: string }[] = [
-    { equipment_id: 'cdq_fan', level: 'DANGER', msg: '干熄焦循环风机轴承温度 78℃ 超上限' },
-    { equipment_id: 'pusher_travel', level: 'WARNING', msg: '推焦车走行机构振动烈度上升趋势' },
-    { equipment_id: 'gas_blower', level: 'WARNING', msg: '煤气鼓风机轴承温度偏高，建议巡检' },
-    { equipment_id: 'guide_grid', level: 'DANGER', msg: '拦焦车导焦栅位移量异常增大' },
-    { equipment_id: 'coal_screw', level: 'WARNING', msg: '装煤车螺旋给料电流波动超限' },
-    { equipment_id: 'chem_pump', level: 'WARNING', msg: '化产离心泵密封温度缓升' },
+  const defs: {
+    equipment_id: number;
+    level: PdmAlarm['level'];
+    source: PdmAlarm['source'];
+    msg: string;
+  }[] = [
+    { equipment_id: 103, level: 'DANGER', source: 'level2_trend_forecast', msg: '干熄焦循环风机轴承温度 78℃ 超上限' },
+    { equipment_id: 101, level: 'WARNING', source: 'level2_trend_forecast', msg: '推焦车走行机构振动烈度上升趋势' },
+    { equipment_id: 105, level: 'WARNING', source: 'level2_trend_forecast', msg: '煤气鼓风机轴承温度偏高，建议巡检' },
+    { equipment_id: 102, level: 'DANGER', source: 'level1_anomaly', msg: '拦焦车导焦栅位移量异常增大' },
+    { equipment_id: 104, level: 'WARNING', source: 'level1_anomaly', msg: '装煤车螺旋给料电流波动超限' },
+    { equipment_id: 106, level: 'WARNING', source: 'level2_trend_forecast', msg: '化产离心泵密封温度缓升' },
   ];
-  const alarms: PdmAlarm[] = defs.map((d, i) => ({
+  const items: PdmAlarm[] = defs.map((d, i) => ({
     alarm_id: 7001 + i,
     equipment_id: d.equipment_id,
     level: d.level,
+    source: d.source,
+    metric: null,
+    metric_value: null,
+    threshold: null,
+    iso10816_zone: null,
     msg: d.msg,
     ts: tsStr(i * 83 + 30),
     // 前 4 条未确认
     acknowledged: i >= 4,
+    handler: null,
+    ack_comment: null,
+    acked_at: null,
   }));
-  return { alarms };
+  return { items };
 }
 
 /**
@@ -120,6 +141,31 @@ export function mockOverviewKpi(): OverviewKpi {
     gas_consumption_m3h: 15420,
     unplanned_stops: 2,
   };
+}
+
+/**
+ * GET /furnace/temp 的 mock（后端恒 503，必走此分支）。
+ * 机/焦侧最新一点快照，字段口径对齐 TDengine furnace_temp 表（方案§3.4.3）；
+ * 数值带以当前分钟为相位的缓慢波动，模拟实时采样。
+ */
+export function mockFurnaceTemp(furnaceId = 1): FurnaceTempResponse {
+  const now = new Date();
+  const phase = (now.getMinutes() * 60 + now.getSeconds()) / 600; // 10 分钟一个慢波周期
+  const round1 = (v: number) => Math.round(v * 10) / 10;
+  const sides: BurnerSide[] = ['machine', 'coke'];
+  const points: TempPoint[] = sides.map((side, i) => ({
+    ts: now.toISOString(),
+    burner_side: side,
+    // 火道温度 1180~1250℃，机侧略低于焦侧
+    fire_channel_temp: round1(1215 + (i === 0 ? -8 : 8) + Math.sin(phase + i * 1.3) * 18),
+    gas_flow: Math.round(15420 + Math.sin(phase) * 260),
+    flue_suction: round1(-165 + Math.sin(phase + 0.6) * 8),
+    collector_pressure: round1(105 + Math.sin(phase + 0.9) * 6),
+    oxygen_content: round1(5.6 + Math.sin(phase + 1.7) * 0.8),
+    control_mode: 'manual',
+    switching: false,
+  }));
+  return { furnace_id: furnaceId, points };
 }
 
 /**

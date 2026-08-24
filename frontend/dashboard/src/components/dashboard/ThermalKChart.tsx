@@ -4,9 +4,8 @@
 import { useMemo } from 'react';
 import type { EChartsOption } from 'echarts';
 import ChartCard from '../ChartCard';
-import { darkLineOption } from './chartTheme';
+import { chartPalette, darkLineOption } from './chartTheme';
 import { aggregateByDate } from './kAggregate';
-import { colors } from '../../styles/tokens';
 import type { KCoefficientRow } from '../../api/types';
 
 interface Props {
@@ -28,8 +27,8 @@ export default function ThermalKChart({ rows, mock = false }: Props) {
           type: 'line',
           smooth: true,
           symbolSize: 6,
-          lineStyle: { color: colors.info },
-          itemStyle: { color: colors.info },
+          lineStyle: { color: chartPalette.main },
+          itemStyle: { color: chartPalette.main },
           data: daily.map((d) => d.k_uniform),
         },
         {
@@ -37,8 +36,8 @@ export default function ThermalKChart({ rows, mock = false }: Props) {
           type: 'line',
           smooth: true,
           symbolSize: 6,
-          lineStyle: { color: colors.success },
-          itemStyle: { color: colors.success },
+          lineStyle: { color: chartPalette.ok },
+          itemStyle: { color: chartPalette.ok },
           data: daily.map((d) => d.k_stable),
         },
       ],
@@ -47,6 +46,6 @@ export default function ThermalKChart({ rows, mock = false }: Props) {
   }, [rows]);
 
   return (
-    <ChartCard title="热工 KPI：K均 / K安 近 7 天" option={option} mock={mock} height={280} />
+    <ChartCard title="热工 KPI：K均 / K安 近 7 天" option={option} mock={mock} height={200} />
   );
 }

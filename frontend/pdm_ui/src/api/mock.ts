@@ -4,13 +4,15 @@
  * 后端状态（services/api/routes/pdm.py）：
  * - GET /pdm/devices 真实可用，但响应只有注册信息 → 运行字段由本文件补齐
  * - GET /pdm/devices/{id}/health 恒 503 → 必走 mock
- * - GET /pdm/alarms 返回空占位（detail 含「待建」）→ 必走 mock
+ * - GET /pdm/alarms 真实查询 pdm_alarm 表 → 503/断网时本文件做降级数据
+ *   （响应形状与新契约一致：items 数组，equipment_id 为 int 设备主键）
  *
  * 全部数据用种子化伪随机生成（种子 = device_id / 固定常量），
  * 保证 10s 轮询期间数值稳定、不跳变。
  */
 import type {
   AlarmLevel,
+  AlarmsResponse,
   AlarmSource,
   DeviceRow,
   DeviceRuntime,
@@ -115,33 +117,46 @@ export function mockHealth(deviceId: string): HealthResponse {
   };
 }
 
-/** 告警 mock：6 条两级预警（方案§4.3.2），设备名取自注册清单 */
-export function mockAlarms(): { alarms: PdmAlarm[] } {
+/** 告警 mock：6 条两级预警（方案§4.3.2），形状与 GET /pdm/alarms 新契约一致 */
+export function mockAlarms(): AlarmsResponse {
   const rand = mulberry32(hashSeed('pdm-alarms'));
-  const specs: { device: number; level: AlarmLevel; source: AlarmSource; msg: string }[] = [
-    { device: 0, level: 'DANGER', source: 'level1_anomaly', msg: '振动速度 8.2 mm/s，进入 ISO 10816 危险区，建议立即检查' },
-    { device: 2, level: 'DANGER', source: 'level2_trend_forecast', msg: '轴承温度 7 天持续上升，趋势预测 3 天内超温' },
-    { device: 1, level: 'WARNING', source: 'level1_anomaly', msg: '导焦栅位移传感器读数异常波动' },
-    { device: 4, level: 'WARNING', source: 'level2_trend_forecast', msg: '振动速度趋势上行，已进入 ISO 10816 注意区' },
-    { device: 3, level: 'WARNING', source: 'level1_anomaly', msg: '电机电流短时超限（超额定值 12%）' },
-    { device: 5, level: 'WARNING', source: 'level2_trend_forecast', msg: '密封温度缓慢爬升，建议安排计划检修' },
+  const specs: {
+    equipment_id: number;
+    level: AlarmLevel;
+    source: AlarmSource;
+    metric: string;
+    metric_value: number;
+    threshold: number;
+    iso10816_zone: string | null;
+    msg: string;
+  }[] = [
+    { equipment_id: 101, level: 'DANGER', source: 'level1_anomaly', metric: 'vibration_speed', metric_value: 8.2, threshold: 7.1, iso10816_zone: '危险', msg: '振动速度 8.2 mm/s，进入 ISO 10816 危险区，建议立即检查' },
+    { equipment_id: 103, level: 'DANGER', source: 'level2_trend_forecast', metric: 'bearing_temp', metric_value: 78.5, threshold: 75, iso10816_zone: null, msg: '轴承温度 7 天持续上升，趋势预测 3 天内超温' },
+    { equipment_id: 102, level: 'WARNING', source: 'level1_anomaly', metric: 'displacement', metric_value: 4.8, threshold: 4.0, iso10816_zone: null, msg: '导焦栅位移传感器读数异常波动' },
+    { equipment_id: 105, level: 'WARNING', source: 'level2_trend_forecast', metric: 'vibration_speed', metric_value: 3.1, threshold: 2.3, iso10816_zone: '注意', msg: '振动速度趋势上行，已进入 ISO 10816 注意区' },
+    { equipment_id: 104, level: 'WARNING', source: 'level1_anomaly', metric: 'motor_current', metric_value: 56.0, threshold: 50, iso10816_zone: null, msg: '电机电流短时超限（超额定值 12%）' },
+    { equipment_id: 106, level: 'WARNING', source: 'level2_trend_forecast', metric: 'seal_temp', metric_value: 68.2, threshold: 65, iso10816_zone: null, msg: '密封温度缓慢爬升，建议安排计划检修' },
   ];
-  const alarms = specs.map((s, i) => {
-    const d = PDM_DEVICE_REGISTRY[s.device];
-    return {
-      alarm_id: `pdm-${d.device_id}-${String(i + 1).padStart(3, '0')}`,
-      equipment_id: d.device_id,
-      level: s.level,
-      source: s.source,
-      msg: s.msg,
-      // 近 24 小时内，种子决定分钟偏移（刷新时分钟级漂移可接受）
-      ts: new Date(Date.now() - Math.floor(rand() * 1440) * 60_000).toISOString(),
-      acknowledged: false,
-    };
-  });
+  const items: PdmAlarm[] = specs.map((s, i) => ({
+    alarm_id: 5001 + i,
+    equipment_id: s.equipment_id,
+    level: s.level,
+    source: s.source,
+    metric: s.metric,
+    metric_value: s.metric_value,
+    threshold: s.threshold,
+    iso10816_zone: s.iso10816_zone,
+    msg: s.msg,
+    // 近 24 小时内，种子决定分钟偏移（刷新时分钟级漂移可接受）
+    ts: new Date(Date.now() - Math.floor(rand() * 1440) * 60_000).toISOString(),
+    acknowledged: false,
+    handler: null,
+    ack_comment: null,
+    acked_at: null,
+  }));
   // 按时间倒序，与后端约定一致
-  alarms.sort((a, b) => (a.ts < b.ts ? 1 : -1));
-  return { alarms };
+  items.sort((a, b) => (a.ts < b.ts ? 1 : -1));
+  return { items };
 }
 
 /** 近 7 天振动速度趋势 mock（旧→新，mm/s）：围绕当前速度种子化波动，末点为当前值 */

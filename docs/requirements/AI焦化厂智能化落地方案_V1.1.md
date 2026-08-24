@@ -17,6 +17,8 @@
 > 9. 预算补充化验设备（煤岩分析）与试验焦炉DOE费用（十二）
 > 10. 前端技术栈由 Vue 3 切换为 React 18 + TypeScript（2026-08-15，6.1 / 8.1）——配合前端工程规范升级（Tailwind/AntD/zustand/Playwright），细则见 frontend/AGENTS.md
 > 11. 后端分层与架构预规划（2026-08-15）：services/api 内部补 core/（安全、全局异常）、db/（连接层）、schemas/（pydantic 契约）；PG 表结构引入编号增量迁移（data/schemas/migrations/）；依赖声明迁 pyproject.toml；monitoring 分 prometheus//grafana/ 两层
+> 12. 表结构补齐（2026-08-15，3.4.5~3.4.8）：新增 coal 煤种主数据表（对应4.1.6煤种数据库）、pdm_alarm（4.3.2两级预警）、vision_alarm（4.4.1，含误报回流标记）、operation_audit（4.4.2审计追溯，由API中间件写入）
+> 13. 驾驶舱大屏接入 DataV 组件库（2026-08-16，6.1）：`@jiaminghi/data-view-react@1.2.5` 仅用于 dashboard 领导驾驶舱（BorderBox 面板边框 / Decoration 标题装饰 / DigitalFlop KPI 翻牌 / ScrollBoard 告警轮播）；peerDeps 为 React16，安装走 legacy-peer-deps（frontend/dashboard/.npmrc 已配）
 
 ---
 
@@ -276,6 +278,102 @@ CREATE TABLE equipment_status (
     last_maintenance_date DATE,
     next_maintenance_date DATE,
     updated_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+#### 3.4.5 煤种主数据表（V1.1修订12新增）
+
+> 对应 4.1.6「20~30个拟采购煤种全分析数据库」。化验字段口径与 blend_detail 一致；
+> 价格/库存为动态数据（ERP每日同步，3.2.1），不入本表。
+
+```sql
+CREATE TABLE coal (
+    id BIGSERIAL PRIMARY KEY,
+    coal_code VARCHAR(50) UNIQUE NOT NULL,  -- 煤种编码
+    name VARCHAR(100) NOT NULL,             -- 煤种名称
+    category VARCHAR(20),                   -- 气煤/肥煤/焦煤/瘦煤/1/3焦煤/贫瘦煤
+    supplier VARCHAR(100),                  -- 供应商
+    enabled BOOLEAN DEFAULT TRUE,           -- 是否纳入优化可选集
+    -- 单种煤全分析（口径同 blend_detail）
+    ash DECIMAL(6,2),                       -- 灰分 Ad(%)
+    volatile DECIMAL(6,2),                  -- 挥发分 Vdaf(%)
+    sulfur DECIMAL(6,3),                    -- 硫分 St,d(%)
+    g_value INT,                            -- 粘结指数 G
+    y_value DECIMAL(5,2),                   -- 胶质层厚度 Y(mm)
+    rmax DECIMAL(5,3),                      -- 镜质组平均最大反射率
+    rmax_distribution JSONB,                -- 反射率分布直方图(分段占比)
+    active_ratio DECIMAL(5,2),              -- 活性物含量(煤岩定量,%)
+    inert_ratio DECIMAL(5,2),               -- 惰性物含量(%)
+    csr DECIMAL(5,2),                       -- 单种煤小焦炉CSR
+    cri DECIMAL(5,2),                       -- 单种煤小焦炉CRI
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    notes TEXT
+);
+```
+
+#### 3.4.6 设备PdM告警表（V1.1修订12新增）
+
+> 对应 4.3.2 两级预警（level1 实时异常 / level2 趋势+ISO10816分级）。
+
+```sql
+CREATE TABLE pdm_alarm (
+    id BIGSERIAL PRIMARY KEY,
+    equipment_id INT NOT NULL,              -- 设备ID（equipment_status.equipment_id）
+    level VARCHAR(10) NOT NULL,             -- 严重度 WARNING/DANGER（API文档§5口径）
+    source VARCHAR(30),                     -- 'level1_anomaly'(实时异常) / 'level2_trend_forecast'(趋势分级)
+    metric VARCHAR(50),                     -- 触发指标(如 vibration_speed)
+    metric_value FLOAT,                     -- 触发值
+    threshold FLOAT,                        -- 触发阈值
+    iso10816_zone VARCHAR(5),               -- ISO 10816 分级 A/B/C/D（趋势分级用）
+    message TEXT,
+    acknowledged BOOLEAN DEFAULT FALSE,
+    handler VARCHAR(50),
+    ack_comment TEXT,
+    acked_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+#### 3.4.7 视觉告警表（V1.1修订12新增）
+
+> 对应 4.4.1 安全视觉告警；误报标记回流训练集（每周重训消费）。
+
+```sql
+CREATE TABLE vision_alarm (
+    id BIGSERIAL PRIMARY KEY,
+    camera_id VARCHAR(50) NOT NULL,         -- 摄像头位号
+    scene VARCHAR(30) NOT NULL,             -- helmet/fire/intrusion/gas_leak/gauge/coke_cake（API文档§5口径）
+    area VARCHAR(50),                       -- 区域（如 焦炉炉顶/地下室/皮带走廊）
+    label VARCHAR(50),                      -- 检测类别（如 flame/smoke，scene 的细粒度补充）
+    confidence DECIMAL(5,4),                -- 置信度
+    level VARCHAR(10),                      -- INFO/WARNING/DANGER
+    message TEXT,
+    snapshot_url VARCHAR(255),              -- 告警截图存储路径
+    acknowledged BOOLEAN DEFAULT FALSE,
+    handler VARCHAR(50),
+    ack_comment TEXT,
+    is_false_positive BOOLEAN DEFAULT FALSE,-- 误报标记（回流模型迭代）
+    acked_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+#### 3.4.8 操作审计表（V1.1修订12新增）
+
+> 对应 4.4.2 审计追溯要求；由 API 操作日志中间件写入（services/api/middleware/operation_log.py），
+> 只记写操作（POST/PUT/DELETE），**不记请求体**（防密码等敏感信息落库）。
+
+```sql
+CREATE TABLE operation_audit (
+    id BIGSERIAL PRIMARY KEY,
+    username VARCHAR(50),                   -- 操作人（无token记 anonymous）
+    method VARCHAR(10),                     -- HTTP方法
+    path VARCHAR(255),                      -- 请求路径（不含请求体）
+    client_ip VARCHAR(45),
+    status_code INT,
+    elapsed_ms INT,
+    created_at TIMESTAMP DEFAULT NOW()
 );
 ```
 
@@ -754,7 +852,7 @@ class CokeAPS:
 | **目标检测** | Ultralytics YOLOv8 | 8.x | 视觉AI |
 | **优化算法** | scikit-opt + OR-Tools | 最新 | GA/PSO/CP-SAT |
 | **后端API** | FastAPI + Uvicorn | 最新 | 模型服务化 |
-| **前端** | React 18 + TypeScript + Vite + Ant Design + Tailwind + ECharts | 18.x | 可视化界面（数字孪生后置） |
+| **前端** | React 18 + TypeScript + Vite + Ant Design + Tailwind + ECharts + DataV（@jiaminghi/data-view-react） | 18.x / 1.2.5 | 可视化界面（数字孪生后置；DataV 仅驾驶舱大屏装饰组件） |
 | **任务调度** | APScheduler + Celery | 最新 | 定时任务/异步 |
 | **模型管理** | MLflow | 2.x | 实验跟踪/模型注册 |
 | **模型部署** | ONNX Runtime / TorchServe | 最新 | 推理服务 |

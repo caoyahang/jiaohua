@@ -5,8 +5,10 @@
 - 3.2.2：opc.tcp / SignAndEncrypt / Username-Password 或证书认证 / 支持历史读取
 - 点位字典来自 config/dcs_tags.yaml 的 opc_ua_server.node_address_space
 
-骨架说明：连接、订阅、回调转发为可运行骨架；TDengine 写入与断线重连
-细节以 TODO 标记，待对接实际 DCS 地址空间后补全。
+骨架说明：连接、订阅、回调转发为可运行骨架；TDengine 写入已实现
+（build_tdengine_statements 纯函数映射 + write_to_tdengine 批量落库）；
+安全策略（SignAndEncrypt/证书）与断线缺口补采以 TODO 标记，待对接实际
+DCS 地址空间后补全。
 """
 
 from __future__ import annotations
@@ -38,7 +40,9 @@ class TagPoint:
     data_type: str
     unit: str
     sampling_rate_ms: int
-    tag_key: Optional[str] = None  # 业务键，如 reversal_status（换向事件源）
+    tag_key: Optional[str] = None     # furnace_temp 列名；事件源为 reversal_status
+    furnace_id: Optional[int] = None  # 焦炉编号（落库子表维度）
+    burner_side: Optional[str] = None # machine / coke / common（炉级公共量）
 
 
 @dataclass
@@ -75,9 +79,80 @@ def load_tag_points(tags_yaml: str | Path) -> List[TagPoint]:
                 unit=item.get("unit", ""),
                 sampling_rate_ms=int(rate),
                 tag_key=item.get("tag_key"),
+                furnace_id=item.get("furnace_id"),
+                burner_side=item.get("burner_side"),
             )
         )
     return points
+
+
+# 事件源点位（换向机构状态）：不入 furnace_temp（无对应列），由 ETL 管道消费做换向期标记
+EVENT_TAGS = frozenset({"reversal_status"})
+
+
+def load_range_limits(settings_yaml: str | Path = "config/settings.yaml") -> Dict[str, tuple]:
+    """从 settings.yaml 读取物理范围检查上下限（quality_check.range 段）。"""
+    with open(settings_yaml, "r", encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+    return {
+        k: (float(v[0]), float(v[1]))
+        for k, v in cfg.get("quality_check", {}).get("range", {}).items()
+    }
+
+
+def build_tdengine_statements(
+    samples: List[Sample],
+    points: List[TagPoint],
+    ranges: Optional[Dict[str, tuple]] = None,
+) -> List[str]:
+    """把采集样本映射为 TDengine 批量 INSERT 语句（纯函数，便于单测）。
+
+    规则：
+    - 子表名 = furnace{furnace_id}_{burner_side}（如 furnace1_machine）；
+    - 事件源点位（reversal_status）跳过，不写 furnace_temp；
+    - 范围检查（settings.yaml quality_check.range）：越限样本**跳过并计数告警**
+      ——furnace_temp 无标记列，入库侧只能拦在门外；完整的四道质量校验
+      （范围/突变/缺失插值/换向期标记）由 ETL 管道对批量数据执行
+      （data/pipeline/quality_check.py，红线见 data/AGENTS.md §5）。
+
+    Returns:
+        SQL 语句列表，形如
+        ``INSERT INTO furnace1_machine (ts, fire_channel_temp) VALUES (169..., 1234.5), ...;``
+    """
+    point_by_node = {p.node_id: p for p in points}
+    # 按 (子表, 列) 分组攒批
+    groups: Dict[tuple, List[tuple]] = {}
+    skipped_range = 0
+    for s in samples:
+        p = point_by_node.get(s.node_id)
+        if p is None or p.tag_key is None or p.tag_key in EVENT_TAGS:
+            continue
+        if p.furnace_id is None or p.burner_side is None:
+            logger.warning("点位 %s 缺少 furnace_id/burner_side 落库映射，跳过", p.node_id)
+            continue
+        if ranges and p.tag_key in ranges:
+            lo, hi = ranges[p.tag_key]
+            try:
+                v = float(s.value)
+            except (TypeError, ValueError):
+                skipped_range += 1
+                continue
+            if v < lo or v > hi:
+                skipped_range += 1
+                continue
+        else:
+            v = float(s.value)
+        subtable = f"furnace{p.furnace_id}_{p.burner_side}"
+        ts_ms = int(s.source_ts * 1000)
+        groups.setdefault((subtable, p.tag_key), []).append((ts_ms, v))
+    if skipped_range:
+        logger.warning("范围检查拦截 %d 个越限样本（不入库）", skipped_range)
+
+    statements: List[str] = []
+    for (subtable, column), rows in groups.items():
+        values = ", ".join(f"({ts}, {val})" for ts, val in rows)
+        statements.append(f"INSERT INTO {subtable} (ts, {column}) VALUES {values};")
+    return statements
 
 
 class OpcuaCollector:
@@ -96,6 +171,7 @@ class OpcuaCollector:
         tags_yaml: str | Path = "config/dcs_tags.yaml",
         on_sample: Optional[Callable[[Sample], None]] = None,
         reconnect_interval: float = 5.0,
+        settings_yaml: str | Path = "config/settings.yaml",
     ) -> None:
         """
         Args:
@@ -103,14 +179,18 @@ class OpcuaCollector:
             tags_yaml: 点位字典文件路径。
             on_sample: 样本回调，通常由 ETL 管道注入。
             reconnect_interval: 断线重连间隔（秒）。
+            settings_yaml: 全局配置路径（读 quality_check.range 范围检查上下限）。
         """
         self.endpoint = endpoint or os.environ.get("OPC_UA_ENDPOINT", "")
         self.points = load_tag_points(tags_yaml)
         self.on_sample = on_sample
         self.reconnect_interval = reconnect_interval
+        self._settings_yaml = settings_yaml
         self._client: Any = None
         self._subscription: Any = None
         self._running = False
+        self._td_conn: Any = None
+        self._ranges: Optional[Dict[str, tuple]] = None
 
     async def connect(self) -> None:
         """建立 OPC UA 会话（SignAndEncrypt + 用户名/口令或证书）。
@@ -197,14 +277,49 @@ class OpcuaCollector:
         if self.on_sample is not None:
             self.on_sample(sample)
 
-    async def write_to_tdengine(self, samples: List[Sample]) -> None:
-        """TDengine 写入接口（预留）。
+    async def write_to_tdengine(self, samples: List[Sample], conn: Any = None) -> int:
+        """批量写入 TDengine furnace_temp 超级表（方案§3.4.3）。
 
-        落库目标为 furnace_temp 超级表（见 data/schemas/tdengine.sql）。
-        TODO: 用 taospy 建连接池，按子表（每炉每侧）批量 INSERT；
-        写库前必须经过 data.pipeline.quality_check 校验与换向期标记。
+        映射规则与质量门槛见 ``build_tdengine_statements``。
+        连接：优先用入参 ``conn``（便于测试/连接池注入）；否则按 TDENGINE_URL
+        懒建连并缓存，写失败时抛弃缓存连接待下次重建（断线重连，data/AGENTS.md §4）。
+
+        Returns:
+            实际执行的 INSERT 语句条数。
         """
-        raise NotImplementedError("TDengine 写入待对接 taospy 后实现")
+        if self._ranges is None:
+            self._ranges = load_range_limits(self._settings_yaml)
+        statements = build_tdengine_statements(samples, self.points, self._ranges)
+        if not statements:
+            return 0
+        own_conn = conn is None
+        if own_conn:
+            conn = self._get_td_conn()
+        try:
+            cur = conn.cursor()
+            try:
+                for sql in statements:
+                    cur.execute(sql)
+            finally:
+                cur.close()
+        except Exception:
+            if own_conn:
+                self._td_conn = None  # 抛弃可疑连接，下次调用重建
+            logger.exception("TDengine 批量写入失败（%d 条语句）", len(statements))
+            raise
+        logger.info("TDengine 写入完成: %d 条 INSERT", len(statements))
+        return len(statements)
+
+    def _get_td_conn(self) -> Any:
+        """懒建并缓存 TDengine 连接（taospy 懒加载，未装也能 import 本模块）。"""
+        if self._td_conn is None:
+            url = os.environ.get("TDENGINE_URL", "")
+            if not url:
+                raise RuntimeError("TDENGINE_URL 未配置")
+            import taospy  # noqa: PLC0415
+
+            self._td_conn = taospy.connect(url=url)
+        return self._td_conn
 
 
 class _SubscriptionHandler:

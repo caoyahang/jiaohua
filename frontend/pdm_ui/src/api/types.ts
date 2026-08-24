@@ -77,20 +77,33 @@ export type AlarmLevel = 'WARNING' | 'DANGER';
 /** 告警来源：level1 实时异常 / level2 趋势预测 */
 export type AlarmSource = 'level1_anomaly' | 'level2_trend_forecast';
 
-/** PdM 告警（GET /pdm/alarms 元素；后端返回空占位，必走 mock） */
+/**
+ * PdM 告警（GET /pdm/alarms 响应元素，契约见 docs/API文档.md §5）。
+ * equipment_id 为 pdm_alarm 表设备主键（int）；设备表未建前无设备名映射，
+ * 页面按编号展示（实现见 services/api/routes/pdm.py _to_alarm_item）。
+ */
 export interface PdmAlarm {
-  alarm_id: string;
-  equipment_id: string;
+  alarm_id: number;
+  equipment_id: number;
   level: AlarmLevel;
   source: AlarmSource;
-  msg: string;
-  /** ISO 8601 时间戳 */
-  ts: string;
+  /** 触发指标名（如 vibration_speed），可空 */
+  metric: string | null;
+  metric_value: number | null;
+  threshold: number | null;
+  /** ISO 10816 分区，可空 */
+  iso10816_zone: string | null;
+  msg: string | null;
   acknowledged: boolean;
+  handler: string | null;
+  ack_comment: string | null;
+  /** 确认时间 ISO 8601，可空 */
+  acked_at: string | null;
+  /** 告警时间 ISO 8601 */
+  ts: string;
 }
 
-/** GET /pdm/alarms 响应（detail 为占位说明，如「告警表待建」） */
+/** GET /pdm/alarms 响应 */
 export interface AlarmsResponse {
-  alarms: PdmAlarm[];
-  detail?: string;
+  items: PdmAlarm[];
 }

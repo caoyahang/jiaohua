@@ -6,8 +6,7 @@ import { useMemo, useState } from 'react';
 import type { EChartsOption } from 'echarts';
 import { Segmented } from 'antd';
 import ChartCard from '../ChartCard';
-import { darkLineOption } from './chartTheme';
-import { colors } from '../../styles/tokens';
+import { chartPalette, darkLineOption } from './chartTheme';
 import type { QualityBatch } from '../../api/types';
 
 interface Props {
@@ -38,8 +37,8 @@ export default function QualityPanel({ batches, mock = true }: Props) {
           type: 'line',
           smooth: true,
           symbolSize: 6,
-          lineStyle: { color: colors.info },
-          itemStyle: { color: colors.info },
+          lineStyle: { color: chartPalette.main },
+          itemStyle: { color: chartPalette.main },
           data: batches.map((b) => b[metric] as number),
         },
         {
@@ -47,8 +46,8 @@ export default function QualityPanel({ batches, mock = true }: Props) {
           type: 'line',
           smooth: true,
           symbolSize: 6,
-          lineStyle: { color: colors.warning, type: 'dashed' },
-          itemStyle: { color: colors.warning },
+          lineStyle: { color: chartPalette.compare, type: 'dashed' },
+          itemStyle: { color: chartPalette.compare },
           data: batches.map((b) => b[predKey] as number),
         },
       ],
@@ -61,15 +60,16 @@ export default function QualityPanel({ batches, mock = true }: Props) {
       title="质量看板：实测 vs AI 预测（近 10 批次）"
       option={option}
       mock={mock}
-      height={280}
-      extra={
-        <Segmented<MetricKey>
-          size="small"
-          value={metric}
-          onChange={setMetric}
-          options={METRICS.map((m) => ({ label: m.label, value: m.key }))}
-        />
-      }
-    />
+      fillHeight
+      className="min-h-0 flex-1"
+    >
+      {/* 指标切换器放正文区：左栏较窄，标题栏放不下（会导致标题塌缩隐藏） */}
+      <Segmented<MetricKey>
+        size="small"
+        value={metric}
+        onChange={setMetric}
+        options={METRICS.map((m) => ({ label: m.label, value: m.key }))}
+      />
+    </ChartCard>
   );
 }

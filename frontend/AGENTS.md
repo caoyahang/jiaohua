@@ -20,6 +20,7 @@
 | 样式 | Tailwind CSS + Sass（仅全局样式/tokens） | 组件样式优先 Tailwind 类 |
 | 样式覆盖 | styled-components | 覆盖 AntD/第三方样式时单独成文件（`*.styled.ts`） |
 | 图表 | echarts + echarts-for-react | |
+| 大屏组件库 | @jiaminghi/data-view-react 1.2.5 | **仅 dashboard 驾驶舱**（BorderBox/Decoration/DigitalFlop/ScrollBoard）；peerDeps 为 React16，安装走 legacy-peer-deps（dashboard/.npmrc 已配） |
 | hooks 工具 | ahooks | 轮询用 useInterval/useRequest |
 | 数据状态 | zustand | 必挂中间件：persist（登录态）+ devtools + subscribeWithSelector |
 | 滚动条 | overlayscrollbars | 滚动区域统一封装 |
@@ -57,6 +58,7 @@
 2. **功能逻辑不与样式写在一起**：样式集中在 Tailwind 类、`src/styles/*.scss`（全局/tokens）、`*.styled.ts`（styled-components）；组件文件只组装。
 3. **禁止内联样式**（`style={{}}`）；动态尺寸等极少数例外须注释说明理由。
 4. **所有颜色必须是 token**：`src/styles/tokens.ts` 单一存放，Tailwind config 与 AntD ConfigProvider theme 同源引用；组件内禁止出现十六进制/rgb 颜色字面量。
+   - **跨模块同源规则**：base `colors` 组四模块同名色值必须一致（改 base = 四个模块一起改）；模块专属扩展放进独立导出组（如 dashboard 的 `darkColors`、pdm_ui 的 `orange`），不回写 base。门禁 `scripts/check_frontend_tokens.py` 自动比对，同名不同值即 fail。
 5. **接口类型来自契约**（见 §2.1）。
 6. 半成品必须显式 TODO，禁止用假数据冒充完成；mock 数据必须挂「演示数据」角标（MockBadge）。
 

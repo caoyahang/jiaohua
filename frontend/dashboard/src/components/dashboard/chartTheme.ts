@@ -3,7 +3,17 @@
  * 所有图表卡片的公共 option 片段从这里出，组件内不出现颜色字面量。
  */
 import type { EChartsOption, SeriesOption } from 'echarts';
-import { darkColors } from '../../styles/tokens';
+import { colors, darkColors } from '../../styles/tokens';
+
+/**
+ * 大屏图表系列色板（同源引用 tokens，组件内不出现颜色字面量）。
+ * main=主系列（青），compare=对比/预测系列（橙），ok=辅助/达标系列（绿）。
+ */
+export const chartPalette = {
+  main: darkColors.accentCyan,
+  compare: darkColors.accentOrange,
+  ok: colors.success,
+} as const;
 
 /** 折线图的公共深色骨架：类目轴 + 数值轴 + tooltip */
 export function darkLineOption(
@@ -34,7 +44,7 @@ export function darkLineOption(
     tooltip: {
       trigger: 'axis',
       backgroundColor: darkColors.bgCard,
-      borderColor: darkColors.border,
+      borderColor: darkColors.accentCyanDim,
       textStyle: { color: darkColors.text },
     },
     xAxis: {
@@ -50,8 +60,9 @@ export function darkLineOption(
       ...(extra?.autoY
         ? { scale: true }
         : {
+            // 整数标度再回除：避免 0.94-0.02=0.91999… 浮点串直接画到刻度标签上
             min: (v: { min: number }) =>
-              Math.floor(Math.min(v.min, extra?.markLineValue ?? 1) * 100) / 100 - 0.02,
+              Math.floor(Math.min(v.min, extra?.markLineValue ?? 1) * 100 - 2) / 100,
             max: 1.05,
           }),
       splitLine: { lineStyle: { color: darkColors.gridLine } },

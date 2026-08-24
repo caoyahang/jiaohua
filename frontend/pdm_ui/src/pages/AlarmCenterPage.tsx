@@ -1,6 +1,6 @@
 /**
- * 告警中心：两级预警列表（GET /pdm/alarms，10s 轮询）。
- * 后端真实可用但返回空占位（detail 含「待建」）→ 识别后降级 mock。
+ * 告警中心：两级预警列表（GET /pdm/alarms 真实查询，10s 轮询）。
+ * 503/断网由 client 降级 mock（挂「演示数据」角标）。
  *
  * TODO: 待后端补 PdM ack 接口。当前「确认」为前端本地状态（stores/alarmAck.ts），
  * 不落库；接口就绪后改为调用后端并回写。
@@ -14,7 +14,7 @@ import { listAlarms } from '../api';
 import type { AlarmLevel, PdmAlarm } from '../api/types';
 import ConfirmModal from '../components/ConfirmModal';
 import MockBadge from '../components/MockBadge';
-import { deviceNameOf, levelTag, sourceText } from '../components/pdmTags';
+import { levelTag, sourceText } from '../components/pdmTags';
 import { useAlarmAckStore } from '../stores/alarmAck';
 
 const LEVEL_OPTIONS = [
@@ -43,7 +43,7 @@ export default function AlarmCenterPage() {
     setLoading(true);
     listAlarms((level || undefined) as AlarmLevel | undefined)
       .then((resp) => {
-        setAlarms(resp.alarms);
+        setAlarms(resp.items);
         setMock(resp.__mock === true);
       })
       .catch((err: unknown) => {
@@ -77,8 +77,9 @@ export default function AlarmCenterPage() {
     {
       title: '设备',
       dataIndex: 'equipment_id',
-      width: 150,
-      render: (v: string) => deviceNameOf(v),
+      width: 110,
+      // 设备表未建（方案§4.3.1 清单待迁库），equipment_id 暂无设备名映射，按编号展示
+      render: (v: number) => `设备 #${v}`,
     },
     {
       title: '来源',
@@ -149,7 +150,7 @@ export default function AlarmCenterPage() {
       </Card>
       <ConfirmModal
         open={target !== null}
-        title={`确认告警：${target ? deviceNameOf(target.equipment_id) : ''}`}
+        title={`确认告警：设备 #${target?.equipment_id ?? ''}`}
         okText="确认"
         onConfirm={onAck}
         onCancel={() => {

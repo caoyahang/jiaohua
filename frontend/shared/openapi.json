@@ -54,7 +54,7 @@
           "智能配煤"
         ],
         "summary": "调配煤优化器",
-        "description": "运行配煤优化：GA(scikit-opt)寻优 + 质量预测模型(LightGBM)评估 + SHAP解释。\n\n返回3套方案：cost_optimal / quality_stable / balanced（4.1.5输出规范）。\n优化器本体在 models/blending_optimizer/，此处只做参数校验与调用编排。",
+        "description": "运行配煤优化：GA(scikit-opt)寻优 + 质量预测模型评估 + 边际贡献解释。\n\n返回3套方案：cost_optimal / quality_stable / balanced（4.1.5输出规范）。\n优化器本体在 models/blending_optimizer/，此处只做参数校验与调用编排。",
         "operationId": "optimize_blend_optimize_post",
         "requestBody": {
           "content": {
@@ -506,7 +506,7 @@
           "设备PdM"
         ],
         "summary": "PdM告警列表",
-        "description": "查询两级预警告警（4.3.2节：level1实时异常 / level2趋势+ISO10816分级）。",
+        "description": "查询两级预警告警（4.3.2节），响应契约见 docs/API文档.md §5。\n\n数据源：PostgreSQL pdm_alarm 表（方案§3.4.6）；level 为严重度，\n两级分类在 source 字段（level1_anomaly 实时异常 / level2_trend_forecast 趋势分级）。",
         "operationId": "list_alarms_pdm_alarms_get",
         "security": [
           {
@@ -514,6 +514,22 @@
           }
         ],
         "parameters": [
+          {
+            "name": "equipment_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Equipment Id"
+            }
+          },
           {
             "name": "level",
             "in": "query",
@@ -532,19 +548,53 @@
             }
           },
           {
-            "name": "device_id",
+            "name": "date_from",
             "in": "query",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "string"
+                  "type": "string",
+                  "format": "date"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "title": "Device Id"
+              "title": "Date From"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "name": "acknowledged",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Acknowledged"
             }
           },
           {
@@ -586,7 +636,7 @@
           "安全视觉"
         ],
         "summary": "视觉告警列表",
-        "description": "查询视觉告警，支持按场景/确认状态过滤，按时间倒序。",
+        "description": "查询视觉告警（vision_alarm 表，方案§3.4.7），按时间倒序。",
         "operationId": "list_alarms_vision_alarms_get",
         "security": [
           {
@@ -607,13 +657,65 @@
                   "type": "null"
                 }
               ],
-              "description": "场景过滤: helmet/fire_smoke/intrusion/gas_leak/meter_reading/coke_maturity",
+              "description": "场景过滤: helmet/fire/intrusion/gas_leak/gauge/coke_cake",
               "title": "Scene"
             },
-            "description": "场景过滤: helmet/fire_smoke/intrusion/gas_leak/meter_reading/coke_maturity"
+            "description": "场景过滤: helmet/fire/intrusion/gas_leak/gauge/coke_cake"
           },
           {
-            "name": "acked",
+            "name": "area",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "区域过滤（如 焦炉炉顶）",
+              "title": "Area"
+            },
+            "description": "区域过滤（如 焦炉炉顶）"
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "name": "acknowledged",
             "in": "query",
             "required": false,
             "schema": {
@@ -626,7 +728,7 @@
                 }
               ],
               "description": "是否已确认",
-              "title": "Acked"
+              "title": "Acknowledged"
             },
             "description": "是否已确认"
           },
@@ -805,6 +907,7 @@
             "default": 1.0
           },
           "lab_data": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Lab Data",
             "description": "化验指标：Ad/Vdaf/St_d/G/Y/Rmax等"
@@ -874,6 +977,7 @@
             "description": "配煤批次号"
           },
           "actual_quality": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Actual Quality",
             "description": "实测焦炭质量：M25/M10/CSR/CRI"
@@ -1018,6 +1122,13 @@
           "type": {
             "type": "string",
             "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",

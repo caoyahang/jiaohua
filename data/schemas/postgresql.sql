@@ -105,6 +105,88 @@ CREATE TABLE equipment_status (
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
+-- ------------------------------------------------------------
+-- 3.4.5 煤种主数据表（价格/库存为ERP动态数据，不入本表）
+-- ------------------------------------------------------------
+CREATE TABLE coal (
+    id BIGSERIAL PRIMARY KEY,
+    coal_code VARCHAR(50) UNIQUE NOT NULL,  -- 煤种编码
+    name VARCHAR(100) NOT NULL,             -- 煤种名称
+    category VARCHAR(20),                   -- 气煤/肥煤/焦煤/瘦煤/1/3焦煤/贫瘦煤
+    supplier VARCHAR(100),                  -- 供应商
+    enabled BOOLEAN DEFAULT TRUE,           -- 是否纳入优化可选集
+    -- 单种煤全分析（口径同 blend_detail）
+    ash DECIMAL(6,2),
+    volatile DECIMAL(6,2),
+    sulfur DECIMAL(6,3),
+    g_value INT,
+    y_value DECIMAL(5,2),
+    rmax DECIMAL(5,3),
+    rmax_distribution JSONB,
+    active_ratio DECIMAL(5,2),
+    inert_ratio DECIMAL(5,2),
+    csr DECIMAL(5,2),
+    cri DECIMAL(5,2),
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    notes TEXT
+);
+
+-- ------------------------------------------------------------
+-- 3.4.6 设备PdM告警表（4.3.2两级预警）
+-- ------------------------------------------------------------
+CREATE TABLE pdm_alarm (
+    id BIGSERIAL PRIMARY KEY,
+    equipment_id INT NOT NULL,
+    level VARCHAR(10) NOT NULL,             -- 严重度 WARNING/DANGER（API文档§5口径）
+    source VARCHAR(30),                     -- 'level1_anomaly' / 'level2_trend_forecast'
+    metric VARCHAR(50),
+    metric_value FLOAT,
+    threshold FLOAT,
+    iso10816_zone VARCHAR(5),               -- ISO 10816 分级 A/B/C/D
+    message TEXT,
+    acknowledged BOOLEAN DEFAULT FALSE,
+    handler VARCHAR(50),
+    ack_comment TEXT,
+    acked_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- ------------------------------------------------------------
+-- 3.4.7 视觉告警表（4.4.1，误报标记回流训练集）
+-- ------------------------------------------------------------
+CREATE TABLE vision_alarm (
+    id BIGSERIAL PRIMARY KEY,
+    camera_id VARCHAR(50) NOT NULL,
+    scene VARCHAR(30) NOT NULL,             -- helmet/fire/intrusion/gas_leak/gauge/coke_cake（API文档§5口径）
+    area VARCHAR(50),                       -- 区域（如 焦炉炉顶/地下室/皮带走廊）
+    label VARCHAR(50),                      -- 检测类别（scene 的细粒度补充）
+    confidence DECIMAL(5,4),
+    level VARCHAR(10),                      -- INFO/WARNING/DANGER
+    message TEXT,
+    snapshot_url VARCHAR(255),
+    acknowledged BOOLEAN DEFAULT FALSE,
+    handler VARCHAR(50),
+    ack_comment TEXT,
+    is_false_positive BOOLEAN DEFAULT FALSE,
+    acked_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- ------------------------------------------------------------
+-- 3.4.8 操作审计表（4.4.2，由API操作日志中间件写入，只记写操作、不记请求体）
+-- ------------------------------------------------------------
+CREATE TABLE operation_audit (
+    id BIGSERIAL PRIMARY KEY,
+    username VARCHAR(50),
+    method VARCHAR(10),
+    path VARCHAR(255),
+    client_ip VARCHAR(45),
+    status_code INT,
+    elapsed_ms INT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
 -- ============================================================
 -- 索引（文档之外补充，按查询场景）
 -- ============================================================
@@ -130,3 +212,19 @@ CREATE INDEX idx_equipment_status_equipment ON equipment_status (equipment_id, u
 CREATE INDEX idx_equipment_status_workshop ON equipment_status (workshop);
 CREATE INDEX idx_equipment_status_status ON equipment_status (status);
 CREATE INDEX idx_equipment_status_vibration_freq ON equipment_status USING GIN (vibration_freq);
+
+-- 煤种主数据：按类别/可用状态筛选优化可选集
+CREATE INDEX idx_coal_category ON coal (category);
+CREATE INDEX idx_coal_enabled ON coal (enabled);
+
+-- PdM告警：按设备/级别查未确认告警，按时间倒序（/pdm/alarms 主路径）
+CREATE INDEX idx_pdm_alarm_equipment ON pdm_alarm (equipment_id, created_at);
+CREATE INDEX idx_pdm_alarm_level ON pdm_alarm (level, acknowledged);
+
+-- 视觉告警：按场景/确认状态查询（/vision/alarms 主路径）
+CREATE INDEX idx_vision_alarm_scene ON vision_alarm (scene, created_at);
+CREATE INDEX idx_vision_alarm_ack ON vision_alarm (acknowledged);
+
+-- 操作审计：按时间/操作人回查
+CREATE INDEX idx_operation_audit_created ON operation_audit (created_at);
+CREATE INDEX idx_operation_audit_user ON operation_audit (username);

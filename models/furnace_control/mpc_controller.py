@@ -145,6 +145,8 @@ class MPCController:
             )
             return tracking + gas_penalty + float(bound_violation) * 100.0
 
+        # scikit-opt 0.6.x 的 PSO 不再接收 seed 参数，用全局随机种子保证可复现
+        np.random.seed(self.seed)
         pso = PSO(
             func=objective,
             n_dim=2,
@@ -153,7 +155,6 @@ class MPCController:
             lb=[limits.GAS_FLOW_LIMIT.abs_min, limits.FLUE_DRAFT_LIMIT.abs_min],
             ub=[limits.GAS_FLOW_LIMIT.abs_max, limits.FLUE_DRAFT_LIMIT.abs_max],
             w=0.8, c1=0.5, c2=0.5,
-            seed=self.seed,
         )
         pso.run()
         best_u = np.asarray(pso.gbest_x, dtype=float)

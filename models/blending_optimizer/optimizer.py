@@ -169,6 +169,8 @@ class BlendingOptimizer:
                 value += (cost - request.max_cost_per_ton) * constraints.PENALTY_WEIGHT * 0.1
             return value
 
+        # scikit-opt 0.6.x 的 GA 不再接收 seed 参数，用全局随机种子保证可复现
+        np.random.seed(self.seed)
         ga = GA(
             func=objective,
             n_dim=n,
@@ -178,10 +180,10 @@ class BlendingOptimizer:
             lb=lb.tolist(),
             ub=ub.tolist(),
             precision=1e-4,
-            seed=self.seed,
         )
         best_x, _ = ga.run()
-        ratios = self._normalize(np.asarray(best_x))
+        # GA 个体经归一化后仍可能越出上下限（缩放所致），输出前投影回有界单纯形
+        ratios = self._project_to_bounds(best_x, lb, ub)
 
         blend_ratio = {c.name: round(float(r), 4) for c, r in zip(coals, ratios) if r > 1e-4}
         quality = self.predictor.predict(coals=single_coals, ratios=ratios.tolist())
@@ -216,3 +218,26 @@ class BlendingOptimizer:
         x = np.clip(np.asarray(x, dtype=float), 0.0, None)
         total = x.sum()
         return x / total if total > 0 else np.full_like(x, 1.0 / len(x))
+
+    @staticmethod
+    def _project_to_bounds(x: np.ndarray, lb: np.ndarray, ub: np.ndarray) -> np.ndarray:
+        """把配比投影到有界单纯形 {lb ≤ r ≤ ub 且 Σr = 1}（水位法迭代）。
+
+        归一化缩放会破坏 GA 保证的逐维上下限，最终方案输出前必须过此投影，
+        保证硬校验（constraints.validate）不会因配比越界报警。
+        前置条件：Σlb ≤ 1 ≤ Σub（路由层已做可行性检查）。
+        """
+        r = np.clip(np.asarray(x, dtype=float), lb, ub)
+        for _ in range(len(r) * 10):  # 每轮至少钉住一个变量，有限步内收敛
+            deficit = 1.0 - r.sum()
+            if abs(deficit) < 1e-12:
+                break
+            if deficit > 0:
+                room = np.where(r < ub - 1e-12, ub - r, 0.0)
+            else:
+                room = np.where(r > lb + 1e-12, r - lb, 0.0)
+            total_room = room.sum()
+            if total_room <= 0:
+                break  # 无可行域，理论不可达（前置检查已拦截）
+            r = np.clip(r + np.sign(deficit) * room / total_room * abs(deficit), lb, ub)
+        return r

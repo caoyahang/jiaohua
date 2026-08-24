@@ -35,7 +35,7 @@ export interface paths {
         put?: never;
         /**
          * 调配煤优化器
-         * @description 运行配煤优化：GA(scikit-opt)寻优 + 质量预测模型(LightGBM)评估 + SHAP解释。
+         * @description 运行配煤优化：GA(scikit-opt)寻优 + 质量预测模型评估 + 边际贡献解释。
          *
          *     返回3套方案：cost_optimal / quality_stable / balanced（4.1.5输出规范）。
          *     优化器本体在 models/blending_optimizer/，此处只做参数校验与调用编排。
@@ -233,7 +233,10 @@ export interface paths {
         };
         /**
          * PdM告警列表
-         * @description 查询两级预警告警（4.3.2节：level1实时异常 / level2趋势+ISO10816分级）。
+         * @description 查询两级预警告警（4.3.2节），响应契约见 docs/API文档.md §5。
+         *
+         *     数据源：PostgreSQL pdm_alarm 表（方案§3.4.6）；level 为严重度，
+         *     两级分类在 source 字段（level1_anomaly 实时异常 / level2_trend_forecast 趋势分级）。
          */
         get: operations["list_alarms_pdm_alarms_get"];
         put?: never;
@@ -253,7 +256,7 @@ export interface paths {
         };
         /**
          * 视觉告警列表
-         * @description 查询视觉告警，支持按场景/确认状态过滤，按时间倒序。
+         * @description 查询视觉告警（vision_alarm 表，方案§3.4.7），按时间倒序。
          */
         get: operations["list_alarms_vision_alarms_get"];
         put?: never;
@@ -368,7 +371,9 @@ export interface components {
              * Lab Data
              * @description 化验指标：Ad/Vdaf/St_d/G/Y/Rmax等
              */
-            lab_data?: Record<string, never>;
+            lab_data?: {
+                [key: string]: unknown;
+            };
         };
         /**
          * ControlModeRequest
@@ -413,7 +418,9 @@ export interface components {
              * Actual Quality
              * @description 实测焦炭质量：M25/M10/CSR/CRI
              */
-            actual_quality: Record<string, never>;
+            actual_quality: {
+                [key: string]: unknown;
+            };
         };
         /**
          * LoginRequest
@@ -497,6 +504,10 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+            /** Input */
+            input?: unknown;
+            /** Context */
+            ctx?: Record<string, never>;
         };
     };
     responses: never;
@@ -830,8 +841,11 @@ export interface operations {
     list_alarms_pdm_alarms_get: {
         parameters: {
             query?: {
+                equipment_id?: number | null;
                 level?: string | null;
-                device_id?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                acknowledged?: boolean | null;
                 limit?: number;
             };
             header?: never;
@@ -863,10 +877,14 @@ export interface operations {
     list_alarms_vision_alarms_get: {
         parameters: {
             query?: {
-                /** @description 场景过滤: helmet/fire_smoke/intrusion/gas_leak/meter_reading/coke_maturity */
+                /** @description 场景过滤: helmet/fire/intrusion/gas_leak/gauge/coke_cake */
                 scene?: string | null;
+                /** @description 区域过滤（如 焦炉炉顶） */
+                area?: string | null;
+                date_from?: string | null;
+                date_to?: string | null;
                 /** @description 是否已确认 */
-                acked?: boolean | null;
+                acknowledged?: boolean | null;
                 limit?: number;
             };
             header?: never;

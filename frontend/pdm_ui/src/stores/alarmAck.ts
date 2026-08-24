@@ -23,10 +23,10 @@ export interface AlarmAck {
 }
 
 interface AlarmAckState {
-  /** alarm_id → 确认记录 */
-  acks: Record<string, AlarmAck>;
+  /** alarm_id（int 主键）→ 确认记录 */
+  acks: Record<number, AlarmAck>;
   /** 确认告警（本地记录，后端接口待建） */
-  ackAlarm: (alarmId: string, ack: Omit<AlarmAck, 'ts'>) => void;
+  ackAlarm: (alarmId: number, ack: Omit<AlarmAck, 'ts'>) => void;
 }
 
 export const useAlarmAckStore = create<AlarmAckState>()(

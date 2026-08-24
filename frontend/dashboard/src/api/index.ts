@@ -4,6 +4,7 @@
  */
 import { request, ApiError, BackendUnreachableError } from './client';
 import {
+  mockFurnaceTemp,
   mockKCoefficients,
   mockOverviewKpi,
   mockPdmAlarms,
@@ -11,6 +12,7 @@ import {
   mockVisionAlarms,
 } from './mock';
 import type {
+  FurnaceTempResponse,
   KCoefficientsResponse,
   OverviewKpi,
   PdmAlarmsResponse,
@@ -71,42 +73,37 @@ export function getKCoefficients(
   );
 }
 
-/**
- * 占位响应判定：后端 vision/pdm 告警接口当前返回「200 空列表 + detail 含待建」，
- * 视为未接通，降级 mock（与 503 同等对待）。
- */
-function isPlaceholder(detail: string | undefined, empty: boolean): boolean {
-  return empty || (detail ?? '').includes('待建');
+/** 实时炉温快照（GET /furnace/temp）：后端恒 503，必走 mock */
+export function getFurnaceTemp(
+  furnaceId = 1,
+): Promise<FurnaceTempResponse & { __mock?: true }> {
+  return request(
+    '/furnace/temp',
+    { method: 'GET', query: { furnace_id: furnaceId } },
+    () => mockFurnaceTemp(furnaceId),
+  );
 }
 
-/** 视觉告警（GET /vision/alarms）：占位/不可达 → mock */
-export async function getVisionAlarms(
+/** 视觉告警（GET /vision/alarms 真实查询 vision_alarm 表）：503/断网 → client 降级 mock */
+export function getVisionAlarms(
   limit = 50,
 ): Promise<VisionAlarmsResponse & { __mock?: true }> {
-  const resp = await request(
+  return request(
     '/vision/alarms',
     { method: 'GET', query: { limit } },
     () => mockVisionAlarms(),
   );
-  if (!resp.__mock && isPlaceholder(resp.detail, resp.alarms.length === 0)) {
-    return { ...mockVisionAlarms(), __mock: true as const };
-  }
-  return resp;
 }
 
-/** PdM 告警（GET /pdm/alarms）：占位/不可达 → mock */
-export async function getPdmAlarms(
+/** PdM 告警（GET /pdm/alarms 真实查询 pdm_alarm 表）：503/断网 → client 降级 mock */
+export function getPdmAlarms(
   limit = 50,
 ): Promise<PdmAlarmsResponse & { __mock?: true }> {
-  const resp = await request(
+  return request(
     '/pdm/alarms',
     { method: 'GET', query: { limit } },
     () => mockPdmAlarms(),
   );
-  if (!resp.__mock && isPlaceholder(resp.detail, resp.alarms.length === 0)) {
-    return { ...mockPdmAlarms(), __mock: true as const };
-  }
-  return resp;
 }
 
 /**
