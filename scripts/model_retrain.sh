@@ -22,20 +22,21 @@ case "${MODEL_NAME}" in
         # 配煤质量预测：LightGBM全量重训（4.1.6节）
         # 训练数据 = 本厂实际配煤+化验数据（含工艺侧特征：结焦时间/火温/堆密度/熄焦方式）
         echo "----- 启动训练 -----"
-        python -m models.quality_predictor.train \
-            --output-dir "${MODEL_DIR:-./data/models}/${MODEL_NAME}" \
-            --mlflow-uri "${MLFLOW_TRACKING_URI}"
+        # train.py 只接受 --config（见 models/quality_predictor/train.py main）；
+        # 训练过程内部已输出各指标 R²/MAE（含离线评估口径）
+        python -m models.quality_predictor.train --config config/model_config.yaml
 
         echo "----- 离线评估（KPI验收口径，见方案10.1节） -----"
-        python -m models.quality_predictor.evaluate \
-            --model-dir "${MODEL_DIR:-./data/models}/${MODEL_NAME}"
+        # TODO: models/quality_predictor/evaluate.py 尚无 CLI 入口（无 main/argparse），
+        #   待补充后启用独立评估；当前评估指标由 train.py 训练时输出。
         # TODO: 评估达标（如CSR/CRI预测R²≥合同阈值）后执行MLflow promote:
         #   mlflow models transition ... --stage Production
         ;;
     pdm_anomaly)
         # PdM异常检测（孤立森林）重训：无监督，仅需正常工况数据
         echo "----- PdM异常检测模型重训 -----"
-        python -m models.pdm.anomaly_detect --retrain
+        # TODO: models/pdm/anomaly_detect.py 尚无 CLI 入口（无 main），待接通后启用：
+        #   python -m models.pdm.anomaly_detect --retrain
         ;;
     *)
         echo "[错误] 未知模型: ${MODEL_NAME}（支持: quality_predictor / pdm_anomaly）" >&2

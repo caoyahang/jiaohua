@@ -37,13 +37,19 @@ def pdm_trend_forecast_job():
 def data_quality_daily_report_job():
     """每日数据质量日报：按3.3节治理标准统计昨日数据质量。
 
-    指标：采集覆盖率(≥95%)、在线率(≥99%)、范围/突变/换向剔除剔除量、缺失插补量。
-    产出：写PostgreSQL data_quality_report表 + 超阈值时告警。
+    指标：采集覆盖率(≥95%)、在线率(≥99%)、范围/突变/换向剔除量、缺失插补量。
+    统计口径见 data/pipeline/quality_report.py（方案§3.3）。
+
+    当前状态：统计函数已就绪；数据源读取（TDengine 昨日各测点序列）与
+    产出落表（data_quality_report 表待建，方案§3.3 未定义该表 DDL）待接通，
+    接通前本任务不产生假数据。
     """
     logger.info("[job] 数据质量日报开始 %s", datetime.now())
-    # TODO: 调 data.pipeline.quality_check 统计昨日各测点校验结果
-    # TODO: 覆盖率<95%或在线率<99%时写告警（关键工艺参数要求100%覆盖）
-    logger.info("[job] 数据质量日报完成（统计管道待接通，本次为空转）")
+    # TODO(数据源): 从 TDengine 读昨日各测点序列 → quality_check 标记 →
+    #   summarize_quality(df, expected_samples=按采样频率推算) 统计
+    # TODO(产出): 写 data_quality_report 表（表结构待建，见 data/schemas/）
+    # TODO(告警): 覆盖率<95%或在线率<99%时写告警（关键参数要求100%覆盖）
+    logger.info("[job] 数据质量日报完成（数据源与落表待接通，本次未产生数据）")
 
 
 def weekly_model_retrain_job():
