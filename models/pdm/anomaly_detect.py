@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import argparse
 import logging
 import pickle
 from pathlib import Path
@@ -104,3 +105,29 @@ class AnomalyDetector:
         obj.model = bundle["model"]
         obj._fitted = True
         return obj
+
+
+def main() -> None:
+    """CLI 入口：训练单设备孤立森林异常检测基线（方案§4.3.2 level1）。
+
+    用法：
+        python -m models.pdm.anomaly_detect \\
+            --device pusher_travel --data data/health_baseline.csv
+    """
+    parser = argparse.ArgumentParser(description="PdM 孤立森林异常检测基线训练（方案§4.3.2 level1）")
+    parser.add_argument("--device", required=True, help="设备编号（如 pusher_travel）")
+    parser.add_argument("--data", required=True, help="健康期监测数据 CSV（列含 vibration/bearing_temp/current 等）")
+    parser.add_argument("--output", default="artifacts/pdm", help="模型保存目录")
+    args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+
+    df = pd.read_csv(args.data)
+    detector = AnomalyDetector(device_id=args.device)
+    detector.fit_baseline(df)
+    out_path = f"{args.output}/anomaly_{args.device}.pkl"
+    detector.save(out_path)
+    logger.info("孤立森林基线训练完成: %s", out_path)
+
+
+if __name__ == "__main__":
+    main()

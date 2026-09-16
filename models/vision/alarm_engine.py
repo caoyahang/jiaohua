@@ -13,11 +13,12 @@ import json
 import logging
 import time
 from dataclasses import asdict, dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
-import redis
+if TYPE_CHECKING:
+    import redis
 
-from .inference import Detection
+    from .inference import Detection
 
 logger = logging.getLogger(__name__)
 

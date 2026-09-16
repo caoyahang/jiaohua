@@ -16,7 +16,6 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 import pandas as pd
-import shap
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +112,7 @@ class BlendExplainer:
     # ------------------------------------------------------------------ #
     def shap_values_for_ml(self, model: Any, X: pd.DataFrame) -> np.ndarray:
         """ML 模型的 TreeExplainer SHAP 值（供 explainer 与 evaluate 复用）。"""
+        import shap  # noqa: PLC0415  # 懒加载：总纲§1
         explainer = shap.TreeExplainer(model)
         return explainer.shap_values(X)
 

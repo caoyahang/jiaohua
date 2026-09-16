@@ -14,7 +14,6 @@ from typing import Callable, Dict, List, Literal, Optional
 
 import numpy as np
 from pydantic import BaseModel, Field
-from sko.GA import GA
 
 from ..quality_predictor.empirical_model import SingleCoal
 from ..quality_predictor.predict import QualityPredictor
@@ -170,6 +169,7 @@ class BlendingOptimizer:
             return value
 
         # scikit-opt 0.6.x 的 GA 不再接收 seed 参数，用全局随机种子保证可复现
+        from sko.GA import GA  # noqa: PLC0415  # 懒加载：总纲§1，未装 scikit-opt 也能 import 本模块
         np.random.seed(self.seed)
         ga = GA(
             func=objective,

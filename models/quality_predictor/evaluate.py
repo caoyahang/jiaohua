@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import argparse
 import logging
+import pickle
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
-import shap
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import KFold, cross_val_score
 
@@ -78,6 +79,7 @@ def shap_summary(
     out.mkdir(parents=True, exist_ok=True)
 
     sample = X.sample(n=min(max_samples, len(X)), random_state=42) if len(X) > max_samples else X
+    import shap  # noqa: PLC0415  # 懒加载：总纲§1
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(sample)
 
@@ -98,3 +100,61 @@ def shap_summary(
     plt.close()
     logger.info("[%s] SHAP 摘要图已保存: %s", target, fig_path)
     return importance
+
+
+def load_models(model_dir: str) -> tuple[Dict[str, Any], List[str]]:
+    """加载四指标 LightGBM 模型（与 predict.py / incremental.py 加载逻辑对齐）。
+
+    Args:
+        model_dir: 模型目录（train.py 输出目录）。
+
+    Returns:
+        (models, feature_columns)：{指标: 模型} 与特征列名列表。
+    """
+    model_dir = Path(model_dir)
+    models: Dict[str, Any] = {}
+    feature_columns: List[str] = []
+    for target in ("M25", "M10", "CSR", "CRI"):
+        pkl = model_dir / f"lgbm_{target}.pkl"
+        if not pkl.exists():
+            logger.warning("模型文件缺失: %s，该指标跳过评估", pkl)
+            continue
+        with open(pkl, "rb") as f:
+            bundle = pickle.load(f)
+        models[target] = bundle["model"]
+        feature_columns = bundle["feature_columns"]
+    return models, feature_columns
+
+
+def main() -> None:
+    """CLI 入口：离线评估已训练模型（方案§10.1 KPI 验收口径）。
+
+    用法：
+        python -m models.quality_predictor.evaluate \\
+            --model-dir artifacts/quality_predictor --data data/eval.csv
+    """
+    parser = argparse.ArgumentParser(description="焦炭质量预测模型离线评估（方案§10.1 KPI验收）")
+    parser.add_argument("--model-dir", default="artifacts/quality_predictor", help="模型目录")
+    parser.add_argument("--data", required=True, help="评估数据 CSV（含特征列与 M25/M10/CSR/CRI 标签）")
+    args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+
+    models, feature_columns = load_models(args.model_dir)
+    if not models:
+        raise SystemExit("未找到任何已训练模型，请先运行 train.py 训练")
+    if not feature_columns:
+        raise SystemExit("模型缺失特征列，无法评估")
+
+    df = pd.read_csv(args.data)
+    X = df[feature_columns]
+    report = evaluate_all_targets(models, X, df)
+    for target, metrics in report.items():
+        logger.info(
+            "[%s] R²=%.3f MAE=%.3f CV-R²=%.3f±%.3f",
+            target, metrics["r2"], metrics["mae"],
+            metrics["cv_r2_mean"], metrics["cv_r2_std"],
+        )
+
+
+if __name__ == "__main__":
+    main()

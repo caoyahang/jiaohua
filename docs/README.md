@@ -69,5 +69,7 @@
 | 2026-08-30 | 全厂运营总览改版 | 方案修订记录第 14 条（§6.1/§7.2/§8.1）；`frontend/dashboard` 从深色 DataV 一屏驾驶舱改为浅色响应式运营管理页，移除 DataV 依赖、工艺 SVG 和告警轮播，保留 KPI/趋势/质量/安全告警及 10 秒轮询；同步 `frontend/AGENTS.md`、模块 README、操作手册、进度跟踪与 Playwright 冒烟测试 |
 | 2026-09-16 | 数据质量日报统计落地 + 文档一致性收尾 | 新增 `data/pipeline/quality_report.py`（覆盖率/在线率/各标记计数统计，方案§3.3）+ `tests/unit/test_quality_report.py`；`services/scheduler/jobs.py` 日报任务接入统计函数并修正 `data_quality_report` 表待建的口径矛盾；`scripts/model_retrain.sh` 训练参数对齐 `train.py --config`（evaluate/anomaly_detect 无 CLI 标注 TODO）；修正远程地址大小写（Cyahang→caoyahang） |
 | 2026-09-16 | 后端接口补 response_model（前后端契约强类型化） | 7 个已实现路由补齐响应契约：`/blend/optimize`、`/blend/recipes`、`/furnace/control-mode`、`/pdm/devices`、`/pdm/alarms`、`/vision/alarms`、`/vision/alarms/{id}/ack`；新建 `services/api/schemas/pdm.py`，blend/furnace/vision schema 追加响应模型；重新导出 `frontend/shared/openapi.json`。未实现路由（temp/ai-setpoint/k-coefficients/health/feedback）响应契约待定契约后补 |
+| 2026-09-16 | 模型层规则补齐：懒加载整改 + 三件套 CLI | sko/shap 4 处函数体内懒加载（optimizer/mpc_controller/explainer/evaluate）；torch/ultralytics 改 PEP 562 包级懒加载（pdm/__init__.py、vision/__init__.py）；alarm_engine 的 redis/Detection 移 TYPE_CHECKING；evaluate.py/anomaly_detect.py 补 main + argparse；四个模型包未装重依赖均可轻量 import |
+
 
 

@@ -13,7 +13,6 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 import numpy as np
-from sko.PSO import PSO
 
 from . import safety_limits
 from .lstm_model import TemperaturePredictor
@@ -146,6 +145,7 @@ class MPCController:
             return tracking + gas_penalty + float(bound_violation) * 100.0
 
         # scikit-opt 0.6.x 的 PSO 不再接收 seed 参数，用全局随机种子保证可复现
+        from sko.PSO import PSO  # noqa: PLC0415  # 懒加载：总纲§1，未装 scikit-opt 也能 import 本模块
         np.random.seed(self.seed)
         pso = PSO(
             func=objective,
