@@ -52,8 +52,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-darkPage">
-      <Card title="焦化厂智能化平台 · 领导驾驶舱" className="w-96 shadow">
+    <div className="flex min-h-screen items-center justify-center bg-bgPage px-4">
+      <Card title="焦化厂智能化平台 · 运营总览" className="w-96 shadow">
         {unreachable && (
           <Alert
             type="warning"

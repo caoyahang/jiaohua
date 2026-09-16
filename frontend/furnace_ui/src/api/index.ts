@@ -5,7 +5,6 @@
 import { request, ApiError, BackendUnreachableError } from './client';
 import {
   mockAiSetpoint,
-  mockControlMode,
   mockKCoefficients,
   mockTemp,
 } from './mock';
@@ -72,7 +71,7 @@ export function getTemp(
   );
 }
 
-/** AI 设定值建议（GET /furnace/ai-setpoint）：真实可用，mock 仅断网兜底 */
+/** AI 设定值建议：模型未就绪时明确展示带角标的演示数据。 */
 export function getAiSetpoint(
   furnaceId: number,
 ): Promise<AiSetpointResponse & { __mock?: true }> {
@@ -83,13 +82,11 @@ export function getAiSetpoint(
   );
 }
 
-/** 切换控制模式（POST /furnace/control-mode）：真实可用，mock 仅断网兜底 */
+/** 切换控制模式：安全相关写操作，网络/Redis异常时必须失败，禁止 mock 成功。 */
 export function setControlMode(
   req: ControlModeRequest,
-): Promise<ControlModeResponse & { __mock?: true }> {
-  return request('/furnace/control-mode', { body: req }, () =>
-    mockControlMode(req),
-  );
+): Promise<ControlModeResponse> {
+  return request('/furnace/control-mode', { body: req });
 }
 
 /** 热工 K 系数（GET /furnace/k-coefficients）：后端恒 503，必走 mock */

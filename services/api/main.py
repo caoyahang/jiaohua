@@ -38,7 +38,10 @@ app = FastAPI(
 # 内网自用：允许前端开发机跨域；生产部署收敛到具体前端域名
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("CORS_ORIGINS", "*").split(","),
+    allow_origins=os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:5173,http://localhost:4173",
+    ).split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -59,8 +62,8 @@ def on_startup():
     logger.info("=" * 50)
     logger.info("AI焦化厂智能化平台 API 启动 (v1.1.0)")
     logger.info("DATABASE_URL: %s", mask_url(os.getenv("DATABASE_URL", "未配置")))
-    logger.info("TDENGINE_URL: %s", os.getenv("TDENGINE_URL", "未配置"))
-    logger.info("REDIS_URL:    %s", os.getenv("REDIS_URL", "未配置"))
+    logger.info("TDENGINE_URL: %s", mask_url(os.getenv("TDENGINE_URL", "未配置")))
+    logger.info("REDIS_URL:    %s", mask_url(os.getenv("REDIS_URL", "未配置")))
     logger.info("已注册路由: /auth /blend /furnace /pdm /vision /health")
     logger.info("=" * 50)
 
@@ -85,9 +88,9 @@ def health():
 
 
 def _check_postgres() -> bool:
-    """PostgreSQL连通性（未配置连接串视为跳过，语义见 tests/conftest.py）。"""
+    """PostgreSQL连通性；未配置连接串视为不可用。"""
     if not os.getenv("DATABASE_URL"):
-        return True
+        return False
     try:
         get_pg_conn().close()
         return True
@@ -96,9 +99,9 @@ def _check_postgres() -> bool:
 
 
 def _check_redis() -> bool:
-    """Redis连通性（未配置连接串视为跳过）。"""
+    """Redis连通性；未配置连接串视为不可用。"""
     if not os.getenv("REDIS_URL"):
-        return True
+        return False
     r = get_redis()
     if r is None:
         return False
@@ -109,9 +112,9 @@ def _check_redis() -> bool:
 
 
 def _check_tdengine() -> bool:
-    """TDengine连通性（未配置连接串视为跳过）。"""
+    """TDengine连通性；未配置连接串视为不可用。"""
     if not os.getenv("TDENGINE_URL"):
-        return True
+        return False
     try:
         get_td_conn().close()
         return True

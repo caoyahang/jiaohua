@@ -932,29 +932,45 @@
           },
           "mode": {
             "type": "string",
-            "pattern": "^(manual|shadow|auto)$",
-            "title": "Mode"
+            "pattern": "^(shadow|auto)$",
+            "title": "Mode",
+            "description": "仅允许影子/自动软切换"
           },
           "operator": {
             "type": "string",
+            "minLength": 1,
             "title": "Operator",
-            "description": "操作人工号/姓名（审计用）"
+            "description": "操作人工号/姓名"
+          },
+          "reviewer": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Reviewer",
+            "description": "复核人工号/姓名"
           },
           "reason": {
             "type": "string",
+            "minLength": 1,
             "title": "Reason",
-            "description": "切换原因",
-            "default": ""
+            "description": "切换原因"
+          },
+          "confirm": {
+            "type": "boolean",
+            "title": "Confirm",
+            "description": "复核人现场确认后必须为 true"
           }
         },
         "type": "object",
         "required": [
           "furnace_id",
           "mode",
-          "operator"
+          "operator",
+          "reviewer",
+          "reason",
+          "confirm"
         ],
         "title": "ControlModeRequest",
-        "description": "控制模式切换请求。"
+        "description": "AI控制模式软切换请求（方案§4.2.2/§4.2.6）。"
       },
       "HTTPValidationError": {
         "properties": {

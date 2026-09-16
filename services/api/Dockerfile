@@ -3,12 +3,14 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# 先装依赖利用构建缓存（requirements.txt在仓库根目录）
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# 拷贝服务代码（模型/数据模块由对应镜像或挂载卷提供）
+# 构建上下文固定为仓库根目录；API 会调用 models/ 与 data/，必须同镜像安装。
+COPY pyproject.toml requirements.txt ./
 COPY services/ ./services/
+COPY data/ ./data/
+COPY models/ ./models/
+RUN pip install --no-cache-dir .
+
+COPY config/ ./config/
 
 ENV PYTHONUNBUFFERED=1 \
     LOG_LEVEL=INFO

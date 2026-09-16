@@ -4,7 +4,7 @@
 import { useMemo } from 'react';
 import type { EChartsOption } from 'echarts';
 import ChartCard from '../ChartCard';
-import { chartPalette, darkLineOption } from './chartTheme';
+import { chartPalette, lineOption } from './chartTheme';
 import { aggregateByDate } from './kAggregate';
 import type { KCoefficientRow } from '../../api/types';
 
@@ -28,7 +28,7 @@ export default function PushKChart({ rows, mock = false }: Props) {
       itemStyle: { color },
       data,
     });
-    return darkLineOption(
+    return lineOption(
       daily.map((d) => d.date),
       [
         mk('K3', chartPalette.compare, daily.map((d) => d.k3)),
@@ -40,6 +40,6 @@ export default function PushKChart({ rows, mock = false }: Props) {
   }, [rows]);
 
   return (
-    <ChartCard title="推焦 KPI：K1 / K2 / K3 近 7 天" option={option} mock={mock} fillHeight className="h-full" />
+    <ChartCard title="推焦执行趋势（K1 / K2 / K3）" option={option} mock={mock} />
   );
 }

@@ -10,7 +10,7 @@
 环境变量（见 .env.example）：
 - JWT_SECRET_KEY: 签名密钥
 - JWT_EXPIRE_MINUTES: token有效期（分钟），默认480
-- ADMIN_USERNAME / ADMIN_PASSWORD: 管理员账号（默认 admin/admin123，仅开发用）
+- ADMIN_USERNAME / ADMIN_PASSWORD: 管理员账号（必须显式配置）
 """
 
 import base64
@@ -28,13 +28,7 @@ from services.api.schemas.auth import LoginRequest, TokenResponse
 
 logger = logging.getLogger(__name__)
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-only-insecure-secret")
 EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "480"))
-
-# TODO: 多用户需求出现时迁移到PostgreSQL用户表（含密码哈希pbkdf2/bcrypt）
-_USERS = {
-    os.getenv("ADMIN_USERNAME", "admin"): os.getenv("ADMIN_PASSWORD", "admin123"),
-}
 
 router = APIRouter(prefix="/auth", tags=["认证"])
 _bearer = HTTPBearer(auto_error=False)
@@ -53,8 +47,31 @@ def _b64url_decode(data: str) -> bytes:
 
 def _sign(message: str) -> str:
     """HMAC-SHA256签名。"""
-    digest = hmac.new(SECRET_KEY.encode(), message.encode(), hashlib.sha256).digest()
+    secret_key = _required_env("JWT_SECRET_KEY")
+    digest = hmac.new(secret_key.encode(), message.encode(), hashlib.sha256).digest()
     return _b64url_encode(digest)
+
+
+def _required_env(name: str) -> str:
+    """读取认证必需环境变量，缺失时拒绝提供认证服务。
+
+    Args:
+        name: 环境变量名。
+
+    Returns:
+        非空的环境变量值。
+
+    Raises:
+        HTTPException: 配置缺失时返回 503，禁止退回开发默认凭据。
+    """
+    value = os.getenv(name, "").strip()
+    if not value:
+        logger.error("认证配置缺失: %s", name)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"认证服务未配置（{name} 缺失）",
+        )
+    return value
 
 
 def create_token(username: str) -> str:
@@ -97,8 +114,12 @@ def get_current_user(
 @router.post("/login", response_model=TokenResponse, summary="登录签发token")
 def login(req: LoginRequest) -> TokenResponse:
     """校验账号密码，签发JWT。失败统一返回401，不区分用户不存在/密码错误。"""
-    expected = _USERS.get(req.username)
-    if expected is None or not hmac.compare_digest(req.password, expected):
+    # TODO: 多用户需求出现时迁移到PostgreSQL用户表（含密码哈希pbkdf2/bcrypt）
+    admin_username = _required_env("ADMIN_USERNAME")
+    admin_password = _required_env("ADMIN_PASSWORD")
+    username_ok = hmac.compare_digest(req.username, admin_username)
+    password_ok = hmac.compare_digest(req.password, admin_password)
+    if not username_ok or not password_ok:
         logger.warning("登录失败: username=%s", req.username)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="用户名或密码错误")
     logger.info("登录成功: username=%s", req.username)

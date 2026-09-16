@@ -20,31 +20,41 @@ from services.api.schemas.furnace import ControlModeRequest
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/furnace", tags=["焦炉加热控制"])
 
-# 设定值安全钳位区间（软件层，DCS侧另有硬钳位）——示例值，按炉型标定
-SAFETY_LIMITS = {
-    "gas_flow": {"min": 8000.0, "max": 20000.0, "max_delta": 500.0},   # m³/h，单步最大变化量
-    "flue_suction": {"min": 80.0, "max": 220.0, "max_delta": 10.0},    # Pa
-}
 
-VALID_MODES = ("manual", "shadow", "auto")
+def _clamp_ai_setpoints(
+    *,
+    gas_flow: float,
+    flue_draft: float,
+    collector_pressure: float,
+    current_gas_flow: float,
+    current_flue_draft: float,
+    current_collector_pressure: float,
+) -> dict[str, float]:
+    """通过安全红线模块统一钳位 MPC 输出（方案§4.2.6）。
 
+    Args:
+        gas_flow: MPC 建议煤气流量，m³/h。
+        flue_draft: MPC 建议分烟道吸力，Pa。
+        collector_pressure: MPC 建议集气管压力，Pa。
+        current_gas_flow: 当前有效煤气流量设定值，m³/h。
+        current_flue_draft: 当前有效分烟道吸力设定值，Pa。
+        current_collector_pressure: 当前有效集气管压力设定值，Pa。
 
-def clamp_setpoint(name: str, value: float, last_value: float) -> tuple[float, bool]:
-    """设定值钳位：先限单步变化速率，再限绝对上下限。
+    Returns:
+        经过 ``models/furnace_control/safety_limits.py`` 钳位后的三通道设定值。
 
-    返回 (钳位后值, 是否发生过钳位)。这是软件层双保险；
-    真正的安全钳位在DCS侧硬回路实现（4.2.6节）。
+    该函数是服务层唯一允许使用的 AI 设定值出口，不在路由层复制任何限值。
     """
-    limits = SAFETY_LIMITS[name]
-    clamped = False
-    delta = value - last_value
-    if abs(delta) > limits["max_delta"]:
-        value = last_value + limits["max_delta"] * (1 if delta > 0 else -1)
-        clamped = True
-    if not limits["min"] <= value <= limits["max"]:
-        value = min(max(value, limits["min"]), limits["max"])
-        clamped = True
-    return round(value, 2), clamped
+    from models.furnace_control.safety_limits import clamp_all  # noqa: PLC0415
+
+    return clamp_all(
+        gas_flow=gas_flow,
+        flue_draft=flue_draft,
+        collector_pressure=collector_pressure,
+        current_gas_flow=current_gas_flow,
+        current_flue_draft=current_flue_draft,
+        current_collector_pressure=current_collector_pressure,
+    )
 
 
 @router.get("/temp", summary="实时炉温")
@@ -66,19 +76,12 @@ def get_ai_setpoint(furnace_id: int, user: str = Depends(get_current_user)):
 
     shadow模式下仅展示不下发；auto模式由控制回路消费本接口结果。
     """
-    # TODO: 读取当前控制模式；manual模式直接返回空建议
-    # TODO: 调用 models.furnace_control.mpc_controller 求解 raw_setpoint
-    # 示例：raw_gas_flow = mpc.solve(...); 以下为占位值
-    raw_gas_flow, last_gas_flow = 15500.0, 15200.0
-    gas_flow, clamped = clamp_setpoint("gas_flow", raw_gas_flow, last_gas_flow)
-    if clamped:
-        logger.warning("furnace=%s 设定值被钳位: raw=%s -> %s", furnace_id, raw_gas_flow, gas_flow)
-    return {
-        "furnace_id": furnace_id,
-        "gas_flow_setpoint": gas_flow,
-        "clamped": clamped,
-        "model_version": None,  # TODO: MLflow模型版本
-    }
+    # 未接通实时工况、MPC 产物与模型版本前，禁止用示例值冒充 AI 输出。
+    # 正式接通时，MPC 原始输出必须先经过 _clamp_ai_setpoints() 再返回/下发。
+    raise HTTPException(
+        status_code=503,
+        detail="AI设定值服务未就绪（实时工况、MPC模型或模型版本缺失）",
+    )
 
 
 @router.post("/control-mode", summary="切换控制模式")
@@ -91,16 +94,16 @@ def set_control_mode(req: ControlModeRequest, user: str = Depends(get_current_us
     """
     key = f"furnace:control_mode:{req.furnace_id}"
     r = get_redis()
-    if r is not None:
-        try:
-            r.set(key, req.mode)
-        except Exception as exc:
-            logger.error("Redis写入失败，模式仅记录到日志: %s", exc)
-    else:
-        logger.error("Redis不可用，模式仅记录到日志")
+    if r is None:
+        raise HTTPException(status_code=503, detail="控制模式存储不可用（Redis未配置）")
+    try:
+        r.set(key, req.mode)
+    except Exception as exc:
+        logger.exception("Redis写入控制模式失败")
+        raise HTTPException(status_code=503, detail="控制模式存储不可用") from exc
     logger.info(
-        "控制模式切换: furnace=%s mode=%s operator=%s api_user=%s reason=%s",
-        req.furnace_id, req.mode, req.operator, user, req.reason,
+        "控制模式切换: furnace=%s mode=%s operator=%s reviewer=%s api_user=%s reason=%s",
+        req.furnace_id, req.mode, req.operator, req.reviewer, user, req.reason,
     )
     return {"furnace_id": req.furnace_id, "mode": req.mode, "status": "ok"}
 

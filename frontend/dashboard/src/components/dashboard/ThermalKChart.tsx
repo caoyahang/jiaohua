@@ -4,7 +4,7 @@
 import { useMemo } from 'react';
 import type { EChartsOption } from 'echarts';
 import ChartCard from '../ChartCard';
-import { chartPalette, darkLineOption } from './chartTheme';
+import { chartPalette, lineOption } from './chartTheme';
 import { aggregateByDate } from './kAggregate';
 import type { KCoefficientRow } from '../../api/types';
 
@@ -19,7 +19,7 @@ const K_UNIFORM_TARGET = 0.9;
 export default function ThermalKChart({ rows, mock = false }: Props) {
   const option = useMemo<EChartsOption>(() => {
     const daily = aggregateByDate(rows);
-    return darkLineOption(
+    return lineOption(
       daily.map((d) => d.date),
       [
         {
@@ -46,6 +46,6 @@ export default function ThermalKChart({ rows, mock = false }: Props) {
   }, [rows]);
 
   return (
-    <ChartCard title="热工 KPI：K均 / K安 近 7 天" option={option} mock={mock} height={200} />
+    <ChartCard title="热工稳定性趋势（K均 / K安）" option={option} mock={mock} />
   );
 }

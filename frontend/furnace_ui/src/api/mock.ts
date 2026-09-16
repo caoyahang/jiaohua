@@ -7,8 +7,6 @@ import type {
   AiSetpointResponse,
   BurnerSide,
   ControlMode,
-  ControlModeRequest,
-  ControlModeResponse,
   KCoeffResponse,
   KShiftRecord,
   TempPoint,
@@ -58,7 +56,7 @@ export function mockTemp(furnaceId: number, mode: ControlMode): TempResponse {
   return { furnace_id: furnaceId, points };
 }
 
-/** GET /furnace/ai-setpoint 的 mock（仅断网兜底，后端接口本身可用） */
+/** GET /furnace/ai-setpoint 的演示数据（后端模型未就绪时使用）。 */
 export function mockAiSetpoint(furnaceId: number): AiSetpointResponse {
   return {
     furnace_id: furnaceId,
@@ -66,11 +64,6 @@ export function mockAiSetpoint(furnaceId: number): AiSetpointResponse {
     clamped: false,
     model_version: null,
   };
-}
-
-/** POST /furnace/control-mode 的 mock（仅断网兜底，后端接口本身可用） */
-export function mockControlMode(req: ControlModeRequest): ControlModeResponse {
-  return { furnace_id: req.furnace_id, mode: req.mode, status: 'ok' };
 }
 
 const SHIFTS = ['早班', '中班', '晚班'] as const;

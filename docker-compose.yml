@@ -31,7 +31,9 @@ services:
 
   # 后端API
   api:
-    build: ./services/api
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
     ports:
       - "8000:8000"
     depends_on:
@@ -42,10 +44,18 @@ services:
       - DATABASE_URL=postgresql://ai_admin:${DB_PASSWORD}@postgres/coke_plant
       - TDENGINE_URL=taos://tdengine:6030
       - REDIS_URL=redis://redis:6379
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:?ADMIN_USERNAME must be set}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD must be set}
+      - JWT_EXPIRE_MINUTES=${JWT_EXPIRE_MINUTES:-480}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:4173}
 
   # 数据采集
   collector:
-    build: ./data/collector
+    profiles: ["field"]
+    build:
+      context: .
+      dockerfile: data/collector/Dockerfile
     depends_on:
       - tdengine
       - postgres
@@ -55,14 +65,24 @@ services:
 
   # 定时任务
   scheduler:
-    build: ./services/scheduler
+    build:
+      context: .
+      dockerfile: services/scheduler/Dockerfile
     depends_on:
       - api
       - redis
+    environment:
+      - DATABASE_URL=postgresql://ai_admin:${DB_PASSWORD}@postgres/coke_plant
+      - TDENGINE_URL=taos://tdengine:6030
+      - REDIS_URL=redis://redis:6379
+      - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI:-http://mlflow:5000}
 
   # 模型训练（GPU可选）
   trainer:
-    build: ./models
+    profiles: ["training"]
+    build:
+      context: .
+      dockerfile: models/Dockerfile
     deploy:
       resources:
         reservations:
@@ -71,7 +91,12 @@ services:
               count: 1
               capabilities: [gpu]
     volumes:
-      - model_data:/app/models
+      - model_data:/app/artifacts
+      - ./config:/app/config:ro
+      - ./data:/app/data
+    environment:
+      - MODEL_DIR=/app/artifacts/quality_predictor
+      - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI:-http://mlflow:5000}
 
   # 监控
   prometheus:

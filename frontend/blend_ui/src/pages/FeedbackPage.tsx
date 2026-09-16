@@ -57,8 +57,13 @@ export default function FeedbackPage() {
         actual_quality: { ...quality },
       });
       setResult(resp);
-      setResultMock(resp.__mock === true);
-      message.success('化验结果已回写');
+      const isMock = resp.__mock === true;
+      setResultMock(isMock);
+      if (isMock) {
+        message.info('回流管道未就绪，仅展示演示结果，数据未实际回写');
+      } else {
+        message.success('化验结果已回写');
+      }
     } catch (err) {
       message.error(err instanceof Error ? err.message : '回写失败');
     } finally {

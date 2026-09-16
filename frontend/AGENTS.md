@@ -7,7 +7,7 @@
 ## 1. 总原则：自用场景从简
 
 - **信息密度优先于视觉效果**——给厂内人员天天用的工具，不是给客户演示的 Demo。
-- 不做 3D 数字孪生（方案已后置）；驾驶舱用 ECharts 平面大屏。
+- 不做 3D 数字孪生（方案已后置）；全厂汇总采用轻量、响应式运营管理页面。
 - 技术栈固定为下表（方案§6.1），**除此之外不得新增依赖**；确需新增先改本表与方案§6.1 登记。
 
 ### 批准依赖清单
@@ -20,7 +20,6 @@
 | 样式 | Tailwind CSS + Sass（仅全局样式/tokens） | 组件样式优先 Tailwind 类 |
 | 样式覆盖 | styled-components | 覆盖 AntD/第三方样式时单独成文件（`*.styled.ts`） |
 | 图表 | echarts + echarts-for-react | |
-| 大屏组件库 | @jiaminghi/data-view-react 1.2.5 | **仅 dashboard 驾驶舱**（BorderBox/Decoration/DigitalFlop/ScrollBoard）；peerDeps 为 React16，安装走 legacy-peer-deps（dashboard/.npmrc 已配） |
 | hooks 工具 | ahooks | 轮询用 useInterval/useRequest |
 | 数据状态 | zustand | 必挂中间件：persist（登录态）+ devtools + subscribeWithSelector |
 | 滚动条 | overlayscrollbars | 滚动区域统一封装 |
@@ -39,7 +38,7 @@
 
 | 模块 | 页面 | 对应 API（`docs/API文档.md`，字段细节以 `services/api/routes/` 代码为准） |
 |---|---|---|
-| `dashboard/` | 全厂 KPI 一屏（K均/K安/K1/K2/K3、成本、能耗、告警汇总） | `GET /furnace/k-coefficients`、`GET /pdm/alarms`、`GET /vision/alarms` |
+| `dashboard/` | 全厂运营总览（K均/K安/K1/K2/K3、成本、能耗、告警汇总） | `GET /furnace/k-coefficients`、`GET /pdm/alarms`、`GET /vision/alarms` |
 | `blend_ui/` | 配煤方案：输入目标质量 → 三套方案对比 → 确认执行 → 化验回流 | `POST /blend/optimize`、`GET /blend/recipes`、`POST /blend/feedback` |
 | `furnace_ui/` | 炉温监控、AI 推荐值 vs 人工值、控制模式切换（manual/shadow/auto） | `GET /furnace/temp`、`GET /furnace/ai-setpoint`、`POST /furnace/control-mode` |
 | `pdm_ui/` | 设备健康评分、两级告警列表与确认 | `GET /pdm/devices`、`GET /pdm/devices/{id}/health`、`GET /pdm/alarms` |
@@ -58,7 +57,7 @@
 2. **功能逻辑不与样式写在一起**：样式集中在 Tailwind 类、`src/styles/*.scss`（全局/tokens）、`*.styled.ts`（styled-components）；组件文件只组装。
 3. **禁止内联样式**（`style={{}}`）；动态尺寸等极少数例外须注释说明理由。
 4. **所有颜色必须是 token**：`src/styles/tokens.ts` 单一存放，Tailwind config 与 AntD ConfigProvider theme 同源引用；组件内禁止出现十六进制/rgb 颜色字面量。
-   - **跨模块同源规则**：base `colors` 组四模块同名色值必须一致（改 base = 四个模块一起改）；模块专属扩展放进独立导出组（如 dashboard 的 `darkColors`、pdm_ui 的 `orange`），不回写 base。门禁 `scripts/check_frontend_tokens.py` 自动比对，同名不同值即 fail。
+   - **跨模块同源规则**：base `colors` 组四模块同名色值必须一致（改 base = 四个模块一起改）；模块专属扩展放进独立导出组（如 pdm_ui 的 `orange`），不回写 base。门禁 `scripts/check_frontend_tokens.py` 自动比对，同名不同值即 fail。
 5. **接口类型来自契约**（见 §2.1）。
 6. 半成品必须显式 TODO，禁止用假数据冒充完成；mock 数据必须挂「演示数据」角标（MockBadge）。
 

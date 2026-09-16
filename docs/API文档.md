@@ -8,6 +8,7 @@
 
 - 认证：`POST /auth/login` 获取 Token，后续请求头携带 `Authorization: Bearer <token>`
 - 错误格式：`{"detail": "错误描述"}`，HTTP 状态码遵循 REST 惯例
+- 未接通的依赖或功能返回 `503`，写操作不得用占位数据返回成功
 - 时间格式：ISO 8601（UTC+8）
 
 ---
@@ -17,6 +18,8 @@
 ### POST /auth/login
 
 用户登录，获取访问 Token。
+
+`JWT_SECRET_KEY`、`ADMIN_USERNAME` 或 `ADMIN_PASSWORD` 未显式配置时返回 `503`，不存在默认账号或开发密钥回退。
 
 **请求体**
 
@@ -45,15 +48,17 @@
 
 ```json
 {
-  "status": "ok",
-  "version": "0.1.0",
+  "status": "degraded",
+  "uptime_sec": 12.3,
   "dependencies": {
-    "postgres": "ok",
-    "tdengine": "ok",
-    "redis": "ok"
+    "postgres": false,
+    "tdengine": false,
+    "redis": false
   }
 }
 ```
+
+依赖全部连通时 `status=ok`；任一连接串缺失或依赖不可达时仍返回 HTTP 200，但 `status=degraded` 且对应值为 `false`。
 
 ---
 
@@ -145,6 +150,8 @@
 
 配煤执行结果反馈回写：化验结果回来后回填实际质量与成本，驱动增量学习闭环（V1.1 §4.1.7）。
 
+> 实现现状（2026-08-30）：预测值比对、Redis 误差缓冲与增量训练尚未接通，固定返回 `503`，禁止返回 accepted 假成功。
+
 **请求体**
 
 ```json
@@ -196,6 +203,8 @@
 
 获取 AI 推荐设定值（影子/自动模式下由 MPC 每 2 个交换周期计算一次，V1.1 §4.2.4）。
 
+> 实现现状（2026-08-30）：实时工况、MPC 模型与模型版本未接通，固定返回 `503`；正式输出必须统一经过 `models/furnace_control/safety_limits.py` 钳位。
+
 **查询参数**：`furnace_id`（必填）
 
 **响应**
@@ -215,25 +224,27 @@
 ### POST /furnace/control-mode
 
 切换控制模式（V1.1 §4.2.2 三阶段）。⚠️ 「一键切手动」为 DCS 硬切换，不经过本接口；
-本接口仅用于 manual → ai_shadow → ai_auto 的软切换，且需双人确认权限。
+本接口仅允许 `shadow` / `auto` 软切换，且必须双人确认；`manual` 状态只能由 DCS 硬切换后同步，不接受 API 软切换。
 
 **请求体**
 
 ```json
 {
   "furnace_id": 1,
-  "target_mode": "ai_auto",
-  "operator_id": 12,
+  "mode": "auto",
+  "operator": "操作员01",
+  "reviewer": "复核员02",
+  "reason": "影子模式评审通过",
   "confirm": true
 }
 ```
 
-`target_mode` 取值：`manual` / `ai_shadow` / `ai_auto`。
+`mode` 仅取 `shadow` / `auto`；复核人不得与操作人相同，`confirm` 必须为 `true`。Redis 未配置或写入失败时返回 `503`。
 
 **响应**
 
 ```json
-{"furnace_id": 1, "control_mode": "ai_auto", "switched_at": "2026-07-26T09:56:00+08:00"}
+{"furnace_id": 1, "mode": "auto", "status": "ok"}
 ```
 
 ### GET /furnace/k-coefficients
@@ -398,3 +409,4 @@ Prometheus 抓取端点（无需认证，仅容器网络内开放），配置见
 | 日期 | 变更 | 对应代码路径 |
 |---|---|---|
 | 2026-08-15 | §5 告警接口对齐实现：`/pdm/alarms` 补 limit 参数与透传字段、明确 level/source 口径；`/vision/alarms` 补透传字段、新增 ack 小节；`/pdm/devices` 改为与代码一致的内存注册表现状（标注台账落库后切换整型主键）；`/pdm/devices/{id}/health` 标注 503 未部署 | `services/api/routes/pdm.py`、`services/api/routes/vision.py` |
+| 2026-08-30 | 消除控制/回流假成功：`/blend/feedback` 与 `/furnace/ai-setpoint` 未就绪时返回 503；控制模式只允许 shadow/auto、强制双人确认且 Redis 失败返回 503；健康检查缺依赖时明确 degraded；认证配置缺失返回 503 | `services/api/routes/blend.py`、`services/api/routes/furnace.py`、`services/api/schemas/furnace.py`、`services/api/main.py`、`services/api/core/security.py` |

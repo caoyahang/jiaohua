@@ -1,6 +1,6 @@
 /**
  * 路由表 + 未登录守卫（未登录一律跳 /login）。
- * 大屏单页：仅 /login 与 / 两条路由。
+ * 运营总览单页：仅 /login 与 / 两条路由。
  */
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import type { ReactNode } from 'react';

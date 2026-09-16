@@ -12,13 +12,13 @@ async function mockBackendDown(page: import('@playwright/test').Page) {
 
 test('登录页渲染：标题、账号密码框、登录按钮可见', async ({ page }) => {
   await page.goto('/login');
-  await expect(page.getByText('焦化厂智能化平台 · 领导驾驶舱')).toBeVisible();
+  await expect(page.getByText('焦化厂智能化平台 · 运营总览')).toBeVisible();
   await expect(page.getByPlaceholder('账号')).toBeVisible();
   await expect(page.getByPlaceholder('密码')).toBeVisible();
   await expect(page.getByRole('button', { name: '登 录' })).toBeVisible();
 });
 
-test('演示模式进入大屏页，KPI 卡片与图表容器渲染', async ({ page }) => {
+test('演示模式进入运营总览，KPI、趋势与告警表格渲染', async ({ page }) => {
   await mockBackendDown(page);
   await page.goto('/login');
   await page.getByPlaceholder('账号').fill('admin');
@@ -28,24 +28,22 @@ test('演示模式进入大屏页，KPI 卡片与图表容器渲染', async ({ p
   await page.getByRole('button', { name: '进入演示模式' }).click();
   await page.waitForURL('**/');
 
-  // 顶部标题栏
-  await expect(page.getByText('AI焦化厂智能管控平台')).toBeVisible();
+  // 常规顶部导航与页面标题
+  await expect(page.getByText('焦化厂智能化平台', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '运营总览' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /刷新/ })).toBeVisible();
   // KPI 卡片区
   await expect(page.getByText('本月配煤成本节约')).toBeVisible();
   await expect(page.getByText('未确认安全告警')).toBeVisible();
-  // 工艺示意图（GET /furnace/temp 恒 503 → mock 渲染）
-  await expect(page.getByText('焦炉加热系统示意')).toBeVisible();
-  await expect(page.getByText('机侧火道温度')).toBeVisible();
-  await expect(page.getByText('炭化室', { exact: true })).toBeVisible();
-  // 各区块卡片标题（图表容器随卡片渲染）
-  await expect(page.getByText('热工 KPI：K均 / K安 近 7 天')).toBeVisible();
-  await expect(page.getByText('推焦 KPI：K1 / K2 / K3 近 7 天')).toBeVisible();
-  await expect(page.getByText('质量看板：实测 vs AI 预测（近 10 批次）')).toBeVisible();
-  await expect(page.getByText('安全看板')).toBeVisible();
-  await expect(page.getByText('视觉 AI 告警（滚动轮播，悬停暂停）')).toBeVisible();
+  // 趋势、质量、安全与告警表格
+  await expect(page.getByText('热工稳定性趋势（K均 / K安）')).toBeVisible();
+  await expect(page.getByText('推焦执行趋势（K1 / K2 / K3）')).toBeVisible();
+  await expect(page.getByText('焦炭质量趋势：实测与 AI 预测')).toBeVisible();
+  await expect(page.getByText('安全与设备告警')).toBeVisible();
+  await expect(page.getByText('最新视觉告警')).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: '告警内容' })).toBeVisible();
   // ECharts 图表容器已挂载
   await expect(page.locator('.echarts-for-react').first()).toBeVisible();
-  // DataV 组件已挂载（BorderBox 边框层 + ScrollBoard 轮播表）
-  await expect(page.locator('.dv-border-box-12').first()).toBeVisible();
-  await expect(page.locator('.dv-scroll-board')).toBeVisible();
+  // 页面不再加载 DataV 驾驶舱组件。
+  await expect(page.locator('[class*="dv-"]')).toHaveCount(0);
 });

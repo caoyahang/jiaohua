@@ -19,37 +19,4 @@ export const colors = {
   textSecondary: '#8c8c8c',
 } as const;
 
-/**
- * 大屏深色 token（本模块新增，原 token 不删）。
- * 领导驾驶舱整屏深色：AntD darkAlgorithm 的覆盖值与 Tailwind 类同源取这里。
- */
-export const darkColors = {
-  // 页面底色：深海蓝黑
-  bgPage: '#0b1526',
-  // 大屏底色：比 bgPage 更深的海蓝（驾驶舱整屏底）
-  bgDeep: '#0a1628',
-  // 卡片底色：略高于页面底
-  bgCard: '#132138',
-  // 卡片描边/分割线
-  border: '#24406b',
-  // 高对比正文
-  text: '#e8f1ff',
-  // 次要文字（坐标轴、说明）
-  textSecondary: '#8fa8cf',
-  // 图表网格线
-  gridLine: '#1d3252',
-  // 科技主色：青（面板描边、装饰线、数值强调）
-  accentCyan: '#22d3ee',
-  // 青色暗调（面板描边底、SVG 管道/轮廓）
-  accentCyanDim: '#155e75',
-  // 告警强调橙（未确认告警、越限数值）
-  accentOrange: '#f59e0b',
-  // KPI 数值强调色
-  kpiValue: '#53c1ff',
-  // 目标线/告警红（比 danger 更亮，深底下可读）
-  alarmRed: '#ff4d4f',
-} as const;
-
-export type DarkColorToken = keyof typeof darkColors;
-
 export type ColorToken = keyof typeof colors;

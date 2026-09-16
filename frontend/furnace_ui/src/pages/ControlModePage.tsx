@@ -30,7 +30,7 @@ const MODE_META: Record<ControlMode, { label: string; color: string }> = {
 };
 
 interface SwitchForm {
-  mode: ControlMode;
+  mode: Exclude<ControlMode, 'manual'>;
   operator: string;
   reviewer: string;
   reason: string;
@@ -58,7 +58,9 @@ export default function ControlModePage() {
         furnace_id: furnaceId,
         mode: pending.mode,
         operator: pending.operator,
-        reason: `${pending.reason}（复核人：${pending.reviewer}）`,
+        reviewer: pending.reviewer,
+        reason: pending.reason,
+        confirm: true,
       });
       saveMode(pending.mode);
       message.success(`控制模式已切换为：${MODE_META[pending.mode].label}`);
@@ -105,11 +107,9 @@ export default function ControlModePage() {
           >
             <Select
               placeholder="请选择目标模式"
-              options={(
-                Object.entries(MODE_META) as [ControlMode, { label: string }][]
-              ).map(([value, meta]) => ({
+              options={(['shadow', 'auto'] as const).map((value) => ({
                 value,
-                label: `${meta.label}（${value}）`,
+                label: `${MODE_META[value].label}（${value}）`,
               }))}
             />
           </Form.Item>

@@ -2,7 +2,7 @@
   "name": "dashboard",
   "private": true,
   "version": "0.1.0",
-  "description": "领导驾驶舱——全厂 KPI 一屏深色大屏（焦化厂智能化平台）",
+  "description": "焦化厂智能化平台——全厂运营总览",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,17 +14,14 @@
   },
   "dependencies": {
     "@ant-design/icons": "^5.5.1",
-    "@jiaminghi/data-view-react": "^1.2.5",
     "ahooks": "^3.8.1",
     "antd": "^5.21.0",
     "echarts": "^5.5.1",
     "echarts-for-react": "^3.0.2",
     "overlayscrollbars": "^2.10.0",
-    "overlayscrollbars-react": "^0.5.6",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.2",
-    "styled-components": "^6.1.13",
     "zustand": "^4.5.5"
   },
   "devDependencies": {

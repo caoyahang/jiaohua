@@ -1,12 +1,12 @@
 /**
- * 质量看板：M25/M10/CSR/CRI 指标切换（Segmented）+ 实测 vs AI 预测双线（近 10 批次）。
+ * 质量趋势：M25/M10/CSR/CRI 指标切换 + 实测与 AI 预测对比。
  * 数据源：固定 mock（后端无 coke_quality 查询接口），角标常显，字段对齐 coke_quality 表。
  */
 import { useMemo, useState } from 'react';
 import type { EChartsOption } from 'echarts';
 import { Segmented } from 'antd';
 import ChartCard from '../ChartCard';
-import { chartPalette, darkLineOption } from './chartTheme';
+import { chartPalette, lineOption } from './chartTheme';
 import type { QualityBatch } from '../../api/types';
 
 interface Props {
@@ -29,7 +29,7 @@ export default function QualityPanel({ batches, mock = true }: Props) {
 
   const option = useMemo<EChartsOption>(() => {
     const predKey = `pred_${metric}` as keyof QualityBatch;
-    return darkLineOption(
+    return lineOption(
       batches.map((b) => b.batch_no.slice(2, 10)),
       [
         {
@@ -57,13 +57,11 @@ export default function QualityPanel({ batches, mock = true }: Props) {
 
   return (
     <ChartCard
-      title="质量看板：实测 vs AI 预测（近 10 批次）"
+      title="焦炭质量趋势：实测与 AI 预测"
       option={option}
       mock={mock}
-      fillHeight
-      className="min-h-0 flex-1"
+      height={300}
     >
-      {/* 指标切换器放正文区：左栏较窄，标题栏放不下（会导致标题塌缩隐藏） */}
       <Segmented<MetricKey>
         size="small"
         value={metric}

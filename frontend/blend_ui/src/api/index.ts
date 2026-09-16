@@ -56,7 +56,7 @@ export async function login(
   return (await resp.json()) as TokenResponse;
 }
 
-/** 配煤优化（POST /blend/optimize）：后端恒 503，必走 mock */
+/** 配煤优化（POST /blend/optimize）：真实可用，依赖缺失/断网时降级 mock */
 export function optimizeBlend(
   req: OptimizeRequest,
 ): Promise<OptimizeResponse & { __mock?: true }> {
@@ -82,7 +82,7 @@ export function listRecipes(
   );
 }
 
-/** 化验结果回写（POST /blend/feedback）：真实可用，mock 仅断网兜底 */
+/** 化验结果回写（POST /blend/feedback）：后端未接通时以演示结果明确降级 */
 export function submitFeedback(
   req: LabFeedback,
 ): Promise<FeedbackResponse & { __mock?: true }> {

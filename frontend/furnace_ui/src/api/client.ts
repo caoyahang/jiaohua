@@ -1,10 +1,10 @@
 /**
  * fetch 封装 + mock 降级约定（四模块统一样板，其他模块照抄）。
  *
- * request<T>(path, opts, mockFn) 行为约定：
+ * request<T>(path, opts, mockFn?) 行为约定：
  * - 自动带 Authorization: Bearer <token>（从 auth store 取）
  * - 2xx（JSON）        → 返回真实数据
- * - 网络异常 / HTTP 503 → 返回 mockFn() 并挂 __mock: true（页面须显示 MockBadge）
+ * - 网络异常 / HTTP 503 → 有 mockFn 时降级；无 mockFn 时抛错（控制写操作严禁 mock 成功）
  * - HTTP 401            → 清 token 跳登录页
  * - 其他 4xx/5xx        → 抛带 detail 的 ApiError，页面用 AntD message/Alert 展示
  * - 非 JSON 响应         → 视为后端不可达（静态预览服务器会回退 index.html），走 mock
@@ -69,12 +69,12 @@ function withMock<T extends object>(mockFn: () => T): T & { __mock: true } {
 }
 
 /**
- * 统一请求入口。mockFn 只在降级时调用，必须返回符合响应类型的演示数据。
+ * 统一请求入口。mockFn 只在允许降级的只读/演示场景传入；控制写操作不得传入。
  */
 export async function request<T extends object>(
   path: string,
   opts: RequestOptions,
-  mockFn: () => T,
+  mockFn?: () => T,
 ): Promise<T & { __mock?: true }> {
   const { token, logout } = useAuthStore.getState();
   let resp: Response;
@@ -88,8 +88,8 @@ export async function request<T extends object>(
       body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
     });
   } catch {
-    // 网络异常：后端不可达，降级 mock
-    return withMock(mockFn);
+    if (mockFn) return withMock(mockFn);
+    throw new BackendUnreachableError();
   }
   if (!isJson(resp)) {
     // 静态预览/网关回退 HTML：401 仍需登出，其余按不可达降级 mock
@@ -98,7 +98,8 @@ export async function request<T extends object>(
       window.location.assign('/login');
       throw new ApiError(401, '登录已失效，请重新登录');
     }
-    return withMock(mockFn);
+    if (mockFn) return withMock(mockFn);
+    throw new BackendUnreachableError();
   }
   if (resp.status === 401) {
     logout();
@@ -106,7 +107,8 @@ export async function request<T extends object>(
     throw new ApiError(401, '登录已失效，请重新登录');
   }
   if (resp.status === 503) {
-    return withMock(mockFn);
+    if (mockFn) return withMock(mockFn);
+    throw new ApiError(resp.status, await readDetail(resp));
   }
   if (!resp.ok) {
     throw new ApiError(resp.status, await readDetail(resp));

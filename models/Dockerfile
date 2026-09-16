@@ -1,4 +1,4 @@
-# AI焦化厂智能化平台 - 定时任务Worker镜像
+# 模型训练镜像（方案§4/§5）；通过 compose training profile 按需运行。
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -12,7 +12,6 @@ RUN pip install --no-cache-dir .
 COPY config/ ./config/
 
 ENV PYTHONUNBUFFERED=1 \
-    LOG_LEVEL=INFO \
-    TZ=Asia/Shanghai
+    LOG_LEVEL=INFO
 
-CMD ["python", "-m", "services.scheduler.worker"]
+ENTRYPOINT ["python", "-m", "models.quality_predictor.train"]

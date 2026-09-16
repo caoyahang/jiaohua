@@ -28,3 +28,26 @@ test('演示模式进入后炉温监控页渲染出图表与「演示数据」�
   // 控制模式徽标全站常显
   await expect(page.getByText('控制模式：手动')).toBeVisible();
 });
+
+test('控制模式软切换不提供 manual，后端不可达时不得显示成功', async ({ page }) => {
+  await page.goto('/login');
+  await page.getByPlaceholder('账号').fill('admin');
+  await page.getByPlaceholder('密码').fill('admin123');
+  await page.getByRole('button', { name: '登 录' }).click();
+  await page.getByRole('button', { name: '进入演示模式' }).click();
+  await page.goto('/control-mode');
+
+  await page.getByLabel('目标模式').click();
+  await expect(page.getByText('影子（shadow）')).toBeVisible();
+  await expect(page.getByText('自动（auto）')).toBeVisible();
+  await expect(page.getByText('手动（manual）')).toHaveCount(0);
+  await page.getByText('影子（shadow）').click();
+  await page.getByLabel('操作人（工号/姓名）').fill('operator01');
+  await page.getByLabel('复核人（工号/姓名，不得与操作人相同）').fill('reviewer02');
+  await page.getByLabel('切换原因').fill('影子模式验证');
+  await page.getByRole('button', { name: '提交切换' }).click();
+  await page.getByRole('button', { name: '确认切换' }).click();
+
+  await expect(page.getByText('切换失败，请重试')).toBeVisible();
+  await expect(page.getByText('控制模式：手动')).toBeVisible();
+});

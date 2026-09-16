@@ -377,7 +377,7 @@ export interface components {
         };
         /**
          * ControlModeRequest
-         * @description 控制模式切换请求。
+         * @description AI控制模式软切换请求（方案§4.2.2/§4.2.6）。
          */
         ControlModeRequest: {
             /**
@@ -385,19 +385,31 @@ export interface components {
              * @description 焦炉编号
              */
             furnace_id: number;
-            /** Mode */
+            /**
+             * Mode
+             * @description 仅允许影子/自动软切换
+             */
             mode: string;
             /**
              * Operator
-             * @description 操作人工号/姓名（审计用）
+             * @description 操作人工号/姓名
              */
             operator: string;
             /**
+             * Reviewer
+             * @description 复核人工号/姓名
+             */
+            reviewer: string;
+            /**
              * Reason
              * @description 切换原因
-             * @default
              */
             reason: string;
+            /**
+             * Confirm
+             * @description 复核人现场确认后必须为 true
+             */
+            confirm: boolean;
         };
         /** HTTPValidationError */
         HTTPValidationError: {

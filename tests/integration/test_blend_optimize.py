@@ -107,3 +107,17 @@ def test_optimize_solves_within_5_seconds():
     resp = client.post("/blend/optimize", json=_optimize_payload(), headers=_auth_header())
     assert resp.status_code == 200
     assert resp.json()["compute_time_ms"] < 5000
+
+
+def test_feedback_returns_503_until_pipeline_is_connected():
+    """化验回流未接通时不得返回 accepted 假成功。"""
+    resp = client.post(
+        "/blend/feedback",
+        json={
+            "batch_no": "BL-TEST-001",
+            "actual_quality": {"M25": 90.8, "M10": 6.3, "CSR": 66.1, "CRI": 24.0},
+        },
+        headers=_auth_header(),
+    )
+    assert resp.status_code == 503
+    assert "未就绪" in resp.json()["detail"]

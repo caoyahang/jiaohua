@@ -1,5 +1,5 @@
 /**
- * 接口类型汇总（领导驾驶舱）。
+ * 接口类型汇总（运营总览，方案§7.2 阶段六）。
  *
  * 红线5：请求/响应类型优先来自 src/api/schema.d.ts（openapi-typescript 生成）。
  * 已知现实（前端规范§2.1）：furnace/pdm/vision 相关路由均未声明 response_model，

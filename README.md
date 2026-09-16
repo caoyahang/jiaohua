@@ -49,7 +49,7 @@
 
 ```bash
 # 1. 配置环境变量
-cp .env.example .env   # 修改 DB_PASSWORD 等
+cp .env.example .env   # 必须修改 DB_PASSWORD、JWT_SECRET_KEY、ADMIN_PASSWORD 等
 
 # 2. 启动数据底座（TDengine / PostgreSQL / Redis）
 docker compose up -d tdengine postgres redis
@@ -58,8 +58,8 @@ docker compose up -d tdengine postgres redis
 psql -h localhost -U ai_admin -d coke_plant -f data/schemas/postgresql.sql
 taos -f data/schemas/tdengine.sql
 
-# 4. 启动采集服务（对接 DCS 后）
-python -m data.collector.opcua_client
+# 4. 现场采集 profile 暂不启用：质量标记持久化与断线补采接通后再启动
+# docker compose --profile field up -d collector
 
 # 5. 启动 API 服务
 uvicorn services.api.main:app --host 0.0.0.0 --port 8000
@@ -99,7 +99,7 @@ curl http://localhost:8000/health
 3. **阶段三（M3~M4）智能配煤优化器**：实时煤价/库存接入、遗传算法优化器、三套方案（成本最优/质量最稳/综合推荐）、约束处理、执行记录回写。验收：求解 < 5秒
 4. **阶段四（M4~M6）焦炉AI加热控制**：LSTM 温度预测 + MPC（PSO求解）；**影子模式连续运行3个月**与人工对比；验证通过后 AI建议+人工确认 → 全自动（保留一键切手动）；安全联锁永远走 DCS 硬回路，AI 只输出 setpoint。验收：AI温控误差 < 人工误差、煤气消耗降 ≥ 2%
 5. **阶段五（M5~M6）设备PdM + 安全视觉**：P0设备振动接入、孤立森林异常检测、LSTM趋势预测（ISO 10816分级）、YOLOv8 安全识别。验收：P0覆盖100%、告警响应 < 5秒
-6. **阶段六（M6~M8）排产优化 + 领导驾驶舱**：OR-Tools CP-SAT 排产、K3系数自动计算、ECharts 平面大屏驾驶舱（数字孪生后置/可选）、移动端关键告警
+6. **阶段六（M6~M8）排产优化 + 全厂运营总览**：OR-Tools CP-SAT 排产、K3系数自动计算、React + ECharts 响应式运营页面（数字孪生后置/可选）、移动端关键告警
 7. **阶段七（M8~M12）闭环迭代**：自动重训管道、模型漂移检测、A/B测试、数据回流自动化、月度性能报告；二期启动化产回收AI优化（化产数据积累≥3个月后）
 
 ## 关键原则

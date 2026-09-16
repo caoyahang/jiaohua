@@ -27,3 +27,21 @@ test('演示模式登录后进入方案优化页，生成方案出现三张卡�
   await expect(page.getByText('质量最稳')).toBeVisible();
   await expect(page.getByText('综合推荐')).toBeVisible();
 });
+
+test('化验回流降级时明确提示未实际回写', async ({ page }) => {
+  await page.goto('/login');
+  await page.getByPlaceholder('账号').fill('admin');
+  await page.getByPlaceholder('密码').fill('admin123');
+  await page.getByRole('button', { name: '登 录' }).click();
+  await page.getByRole('button', { name: '进入演示模式' }).click();
+  await page.goto('/feedback');
+
+  await page.getByRole('combobox').click();
+  await page.locator('.ant-select-item-option').first().click();
+  await page.getByRole('button', { name: '提交回写' }).click();
+
+  await expect(
+    page.getByText('回流管道未就绪，仅展示演示结果，数据未实际回写'),
+  ).toBeVisible();
+  await expect(page.getByText('演示数据').first()).toBeVisible();
+});

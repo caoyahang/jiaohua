@@ -131,9 +131,8 @@ def feedback(fb: LabFeedback, user: str = Depends(get_current_user)):
     # TODO: 从blend_recipe表取该批次predicted_quality；不存在则404
     # TODO: 逐指标计算误差，任一超ERROR_THRESHOLD则lpush到Redis误差缓冲区
     # TODO: 缓冲区长度>=BUFFER_TRIGGER_SIZE时调用IncrementalLearner._incremental_train()
-    logger.info("化验回流接收: batch_no=%s user=%s", fb.batch_no, user)
-    return {
-        "batch_no": fb.batch_no,
-        "status": "accepted",
-        "detail": "已接收，待与预测值比对（增量学习管道待接通）",
-    }
+    logger.warning("化验回流管道未就绪: batch_no=%s user=%s", fb.batch_no, user)
+    raise HTTPException(
+        status_code=503,
+        detail="化验回流管道未就绪（预测值比对、误差缓冲与增量学习尚未接通）",
+    )
