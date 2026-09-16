@@ -12,7 +12,12 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from services.api.core.security import get_current_user
 from services.api.db.connections import get_pg_conn
-from services.api.schemas.blend import LabFeedback, OptimizeRequest
+from services.api.schemas.blend import (
+    LabFeedback,
+    OptimizeRequest,
+    OptimizeResponse,
+    RecipeListResponse,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/blend", tags=["智能配煤"])
@@ -46,7 +51,7 @@ def _get_optimizer():
 
 # ---------- 接口 ----------
 
-@router.post("/optimize", summary="调配煤优化器")
+@router.post("/optimize", response_model=OptimizeResponse, summary="调配煤优化器")
 def optimize(req: OptimizeRequest, user: str = Depends(get_current_user)):
     """运行配煤优化：GA(scikit-opt)寻优 + 质量预测模型评估 + 边际贡献解释。
 
@@ -96,7 +101,7 @@ def optimize(req: OptimizeRequest, user: str = Depends(get_current_user)):
     return resp
 
 
-@router.get("/recipes", summary="历史配煤方案查询")
+@router.get("/recipes", response_model=RecipeListResponse, summary="历史配煤方案查询")
 def list_recipes(
     furnace_id: int | None = None,
     limit: int = 50,

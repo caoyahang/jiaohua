@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from services.api.core.security import get_current_user
 from services.api.db.connections import get_pg_conn
+from services.api.schemas.pdm import DevicesResponse, PdmAlarmsResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/pdm", tags=["设备PdM"])
@@ -37,7 +38,7 @@ DEVICE_REGISTRY = [
 ]
 
 
-@router.get("/devices", summary="监控设备列表")
+@router.get("/devices", response_model=DevicesResponse, summary="监控设备列表")
 def list_devices(priority: str | None = Query(None, pattern="^P[012]$"),
                  user: str = Depends(get_current_user)):
     """返回监控设备清单，支持按优先级P0/P1/P2过滤。"""
@@ -59,7 +60,7 @@ def get_health(device_id: str, user: str = Depends(get_current_user)):
     raise HTTPException(status_code=503, detail="健康评分模型未部署")
 
 
-@router.get("/alarms", summary="PdM告警列表")
+@router.get("/alarms", response_model=PdmAlarmsResponse, summary="PdM告警列表")
 def list_alarms(
     equipment_id: int | None = None,
     level: str | None = Query(None, pattern="^(WARNING|DANGER)$"),

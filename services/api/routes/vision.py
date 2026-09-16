@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from services.api.core.security import get_current_user
 from services.api.db.connections import get_pg_conn
-from services.api.schemas.vision import AckRequest
+from services.api.schemas.vision import AckRequest, AckResponse, VisionAlarmsResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/vision", tags=["安全视觉"])
@@ -22,7 +22,7 @@ router = APIRouter(prefix="/vision", tags=["安全视觉"])
 ALARM_SCENES = ("helmet", "fire", "intrusion", "gas_leak", "gauge", "coke_cake")
 
 
-@router.get("/alarms", summary="视觉告警列表")
+@router.get("/alarms", response_model=VisionAlarmsResponse, summary="视觉告警列表")
 def list_alarms(
     scene: str | None = Query(None, description=f"场景过滤: {'/'.join(ALARM_SCENES)}"),
     area: str | None = Query(None, description="区域过滤（如 焦炉炉顶）"),
@@ -92,7 +92,7 @@ def list_alarms(
     }
 
 
-@router.post("/alarms/{alarm_id}/ack", summary="视觉告警确认")
+@router.post("/alarms/{alarm_id}/ack", response_model=AckResponse, summary="视觉告警确认")
 def ack_alarm(alarm_id: int, req: AckRequest, user: str = Depends(get_current_user)):
     """确认告警：记录处理人与处置意见；误报标记回流训练集迭代（每周重训消费）。"""
     conn = get_pg_conn()

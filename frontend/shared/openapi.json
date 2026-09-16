@@ -71,7 +71,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/OptimizeResponse"
+                }
               }
             }
           },
@@ -139,7 +141,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/RecipeListResponse"
+                }
               }
             }
           },
@@ -316,7 +320,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ControlModeResponse"
+                }
               }
             }
           },
@@ -437,7 +443,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/DevicesResponse"
+                }
               }
             }
           },
@@ -613,7 +621,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/PdmAlarmsResponse"
+                }
               }
             }
           },
@@ -748,7 +758,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/VisionAlarmsResponse"
+                }
               }
             }
           },
@@ -804,7 +816,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/AckResponse"
+                }
               }
             }
           },
@@ -867,6 +881,76 @@
         ],
         "title": "AckRequest",
         "description": "告警确认请求。"
+      },
+      "AckResponse": {
+        "properties": {
+          "alarm_id": {
+            "type": "integer",
+            "title": "Alarm Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "alarm_id",
+          "status"
+        ],
+        "title": "AckResponse",
+        "description": "POST /vision/alarms/{id}/ack 响应。"
+      },
+      "BlendSolution": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "方案类型：cost_optimal/quality_stable/balanced"
+          },
+          "blend_ratio": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Blend Ratio",
+            "description": "各煤种配比（和为1）"
+          },
+          "estimated_cost": {
+            "type": "number",
+            "title": "Estimated Cost",
+            "description": "预估吨煤成本 元/吨"
+          },
+          "predicted_quality": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Predicted Quality",
+            "description": "预测质量：M25/M10/CSR/CRI"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence",
+            "description": "置信度 0~1"
+          },
+          "explanation": {
+            "type": "string",
+            "title": "Explanation",
+            "description": "SHAP/边际贡献中文解释",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "blend_ratio",
+          "estimated_cost",
+          "predicted_quality",
+          "confidence"
+        ],
+        "title": "BlendSolution",
+        "description": "单套配煤方案（方案§4.1.5 输出规范）。\n\n字段与 models/blending_optimizer/optimizer.py 的 BlendSolution 对齐，\n此处为服务层契约（不依赖 scikit-opt 重依赖，可被路由轻量引用）。"
       },
       "CoalInfo": {
         "properties": {
@@ -972,6 +1056,55 @@
         "title": "ControlModeRequest",
         "description": "AI控制模式软切换请求（方案§4.2.2/§4.2.6）。"
       },
+      "ControlModeResponse": {
+        "properties": {
+          "furnace_id": {
+            "type": "integer",
+            "title": "Furnace Id",
+            "description": "焦炉编号"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode",
+            "description": "切换后的控制模式"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "状态：ok"
+          }
+        },
+        "type": "object",
+        "required": [
+          "furnace_id",
+          "mode",
+          "status"
+        ],
+        "title": "ControlModeResponse",
+        "description": "POST /furnace/control-mode 响应（方案§4.2.2）。"
+      },
+      "DevicesResponse": {
+        "properties": {
+          "devices": {
+            "items": {
+              "$ref": "#/components/schemas/PdmDevice"
+            },
+            "type": "array",
+            "title": "Devices"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "devices",
+          "total"
+        ],
+        "title": "DevicesResponse",
+        "description": "GET /pdm/devices 响应。"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1059,6 +1192,352 @@
         ],
         "title": "OptimizeRequest",
         "description": "配煤优化请求（4.1.5输入JSON）。"
+      },
+      "OptimizeResponse": {
+        "properties": {
+          "solutions": {
+            "items": {
+              "$ref": "#/components/schemas/BlendSolution"
+            },
+            "type": "array",
+            "title": "Solutions",
+            "description": "三套方案"
+          },
+          "model_version": {
+            "type": "string",
+            "title": "Model Version",
+            "description": "模型版本"
+          },
+          "compute_time_ms": {
+            "type": "integer",
+            "title": "Compute Time Ms",
+            "description": "求解耗时 毫秒",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "solutions",
+          "model_version"
+        ],
+        "title": "OptimizeResponse",
+        "description": "配煤优化响应（方案§4.1.5）。"
+      },
+      "PdmAlarm": {
+        "properties": {
+          "alarm_id": {
+            "type": "integer",
+            "title": "Alarm Id"
+          },
+          "equipment_id": {
+            "type": "integer",
+            "title": "Equipment Id"
+          },
+          "level": {
+            "type": "string",
+            "title": "Level",
+            "description": "告警级别：WARNING/DANGER"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "来源：level1_anomaly/level2_trend_forecast"
+          },
+          "metric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metric"
+          },
+          "metric_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metric Value"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          },
+          "iso10816_zone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Iso10816 Zone"
+          },
+          "msg": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Msg"
+          },
+          "acknowledged": {
+            "type": "boolean",
+            "title": "Acknowledged"
+          },
+          "handler": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handler"
+          },
+          "ack_comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ack Comment"
+          },
+          "acked_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acked At"
+          },
+          "ts": {
+            "type": "string",
+            "title": "Ts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "alarm_id",
+          "equipment_id",
+          "level",
+          "source",
+          "acknowledged",
+          "ts"
+        ],
+        "title": "PdmAlarm",
+        "description": "PdM 告警（GET /pdm/alarms 响应元素，方案§4.3.2 两级预警）。"
+      },
+      "PdmAlarmsResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PdmAlarm"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "PdmAlarmsResponse",
+        "description": "GET /pdm/alarms 响应。"
+      },
+      "PdmDevice": {
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "title": "Device Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "priority": {
+            "type": "string",
+            "title": "Priority",
+            "description": "优先级：P0/P1/P2"
+          },
+          "sensors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sensors",
+            "description": "监测传感器类型"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_id",
+          "name",
+          "priority",
+          "sensors"
+        ],
+        "title": "PdmDevice",
+        "description": "监控设备（GET /pdm/devices 响应元素，方案§4.3.1 监控对象清单）。"
+      },
+      "RecipeListResponse": {
+        "properties": {
+          "recipes": {
+            "items": {
+              "$ref": "#/components/schemas/RecipeRow"
+            },
+            "type": "array",
+            "title": "Recipes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "recipes"
+        ],
+        "title": "RecipeListResponse",
+        "description": "GET /blend/recipes 响应。"
+      },
+      "RecipeRow": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "batch_no": {
+            "type": "string",
+            "title": "Batch No"
+          },
+          "furnace_id": {
+            "type": "integer",
+            "title": "Furnace Id"
+          },
+          "production_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Production Date"
+          },
+          "total_coal_tons": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Coal Tons"
+          },
+          "estimated_cost_per_ton": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Cost Per Ton"
+          },
+          "actual_cost_per_ton": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Cost Per Ton"
+          },
+          "ai_generated": {
+            "type": "boolean",
+            "title": "Ai Generated",
+            "default": false
+          },
+          "operator_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operator Id"
+          },
+          "approved_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved By"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "batch_no",
+          "furnace_id"
+        ],
+        "title": "RecipeRow",
+        "description": "历史配煤方案行（blend_recipe 表，方案§3.4.1）。"
       },
       "TargetQuality": {
         "properties": {
@@ -1154,6 +1633,128 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VisionAlarm": {
+        "properties": {
+          "alarm_id": {
+            "type": "integer",
+            "title": "Alarm Id"
+          },
+          "scene": {
+            "type": "string",
+            "title": "Scene"
+          },
+          "area": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area"
+          },
+          "camera_id": {
+            "type": "string",
+            "title": "Camera Id"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "msg": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Msg"
+          },
+          "snapshot_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Url"
+          },
+          "acknowledged": {
+            "type": "boolean",
+            "title": "Acknowledged"
+          },
+          "is_false_positive": {
+            "type": "boolean",
+            "title": "Is False Positive"
+          },
+          "ts": {
+            "type": "string",
+            "title": "Ts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "alarm_id",
+          "scene",
+          "camera_id",
+          "acknowledged",
+          "is_false_positive",
+          "ts"
+        ],
+        "title": "VisionAlarm",
+        "description": "视觉告警（GET /vision/alarms 响应元素，方案§3.4.7/§4.4.1）。"
+      },
+      "VisionAlarmsResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/VisionAlarm"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "VisionAlarmsResponse",
+        "description": "GET /vision/alarms 响应。"
       }
     },
     "securitySchemes": {

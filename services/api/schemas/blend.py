@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date, datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -40,3 +42,49 @@ class LabFeedback(BaseModel):
 
     batch_no: str = Field(..., description="配煤批次号")
     actual_quality: dict = Field(..., description="实测焦炭质量：M25/M10/CSR/CRI")
+
+
+class BlendSolution(BaseModel):
+    """单套配煤方案（方案§4.1.5 输出规范）。
+
+    字段与 models/blending_optimizer/optimizer.py 的 BlendSolution 对齐，
+    此处为服务层契约（不依赖 scikit-opt 重依赖，可被路由轻量引用）。
+    """
+
+    type: str = Field(..., description="方案类型：cost_optimal/quality_stable/balanced")
+    blend_ratio: dict[str, float] = Field(..., description="各煤种配比（和为1）")
+    estimated_cost: float = Field(..., description="预估吨煤成本 元/吨")
+    predicted_quality: dict[str, float] = Field(..., description="预测质量：M25/M10/CSR/CRI")
+    confidence: float = Field(..., description="置信度 0~1")
+    explanation: str = Field("", description="SHAP/边际贡献中文解释")
+
+
+class OptimizeResponse(BaseModel):
+    """配煤优化响应（方案§4.1.5）。"""
+
+    solutions: list[BlendSolution] = Field(..., description="三套方案")
+    model_version: str = Field(..., description="模型版本")
+    compute_time_ms: int = Field(0, description="求解耗时 毫秒")
+
+
+class RecipeRow(BaseModel):
+    """历史配煤方案行（blend_recipe 表，方案§3.4.1）。"""
+
+    id: int
+    batch_no: str
+    furnace_id: int
+    production_date: date | None = None
+    total_coal_tons: float | None = None
+    estimated_cost_per_ton: float | None = None
+    actual_cost_per_ton: float | None = None
+    ai_generated: bool = False
+    operator_id: int | None = None
+    approved_by: int | None = None
+    created_at: datetime | None = None
+    notes: str | None = None
+
+
+class RecipeListResponse(BaseModel):
+    """GET /blend/recipes 响应。"""
+
+    recipes: list[RecipeRow]

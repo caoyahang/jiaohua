@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from services.api.core.security import get_current_user
 from services.api.db.connections import get_redis, get_td_conn
-from services.api.schemas.furnace import ControlModeRequest
+from services.api.schemas.furnace import ControlModeRequest, ControlModeResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/furnace", tags=["焦炉加热控制"])
@@ -84,7 +84,7 @@ def get_ai_setpoint(furnace_id: int, user: str = Depends(get_current_user)):
     )
 
 
-@router.post("/control-mode", summary="切换控制模式")
+@router.post("/control-mode", response_model=ControlModeResponse, summary="切换控制模式")
 def set_control_mode(req: ControlModeRequest, user: str = Depends(get_current_user)):
     """切换 manual/shadow/auto。
 

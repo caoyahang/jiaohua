@@ -23,3 +23,11 @@ class ControlModeRequest(BaseModel):
         if not self.confirm:
             raise ValueError("控制模式软切换必须双人确认")
         return self
+
+
+class ControlModeResponse(BaseModel):
+    """POST /furnace/control-mode 响应（方案§4.2.2）。"""
+
+    furnace_id: int = Field(..., description="焦炉编号")
+    mode: str = Field(..., description="切换后的控制模式")
+    status: str = Field(..., description="状态：ok")

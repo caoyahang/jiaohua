@@ -68,4 +68,6 @@
 | 2026-08-30 | P0 安全与部署首轮整改 | 安全设定值出口统一到 `models/furnace_control/safety_limits.py`（限值数值未改）；未完成的 AI setpoint/feedback 改为 503；控制模式强制双人确认且禁止 manual 软切换，前端安全写操作禁止 mock 成功；认证取消默认凭据、健康检查缺依赖改 degraded；Docker 构建上下文/认证注入修复并将未就绪 collector/trainer 隔离到 profile；同步 API/前端契约与回归测试 |
 | 2026-08-30 | 全厂运营总览改版 | 方案修订记录第 14 条（§6.1/§7.2/§8.1）；`frontend/dashboard` 从深色 DataV 一屏驾驶舱改为浅色响应式运营管理页，移除 DataV 依赖、工艺 SVG 和告警轮播，保留 KPI/趋势/质量/安全告警及 10 秒轮询；同步 `frontend/AGENTS.md`、模块 README、操作手册、进度跟踪与 Playwright 冒烟测试 |
 | 2026-09-16 | 数据质量日报统计落地 + 文档一致性收尾 | 新增 `data/pipeline/quality_report.py`（覆盖率/在线率/各标记计数统计，方案§3.3）+ `tests/unit/test_quality_report.py`；`services/scheduler/jobs.py` 日报任务接入统计函数并修正 `data_quality_report` 表待建的口径矛盾；`scripts/model_retrain.sh` 训练参数对齐 `train.py --config`（evaluate/anomaly_detect 无 CLI 标注 TODO）；修正远程地址大小写（Cyahang→caoyahang） |
+| 2026-09-16 | 后端接口补 response_model（前后端契约强类型化） | 7 个已实现路由补齐响应契约：`/blend/optimize`、`/blend/recipes`、`/furnace/control-mode`、`/pdm/devices`、`/pdm/alarms`、`/vision/alarms`、`/vision/alarms/{id}/ack`；新建 `services/api/schemas/pdm.py`，blend/furnace/vision schema 追加响应模型；重新导出 `frontend/shared/openapi.json`。未实现路由（temp/ai-setpoint/k-coefficients/health/feedback）响应契约待定契约后补 |
+
 
