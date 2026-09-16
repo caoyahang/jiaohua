@@ -31,3 +31,26 @@ class ControlModeResponse(BaseModel):
     furnace_id: int = Field(..., description="焦炉编号")
     mode: str = Field(..., description="切换后的控制模式")
     status: str = Field(..., description="状态：ok")
+
+
+class KShiftRecord(BaseModel):
+    """单班次热工/推焦 K 系数（方案§4.2.6 统一考核口径）。
+
+    字段名与 `docs/API文档.md` §GET /furnace/k-coefficients 契约一致；
+    K3 恒等于 K1×K2（红线恒等式，见 data/pipeline/k_coefficients.py）。
+    """
+
+    furnace_id: int = Field(..., description="焦炉编号")
+    shift_date: str = Field(..., description="班次日期 YYYY-MM-DD")
+    shift: str = Field(..., description="班次：早班/中班/晚班")
+    k_uniform: float = Field(..., description="K均：直行温度均匀系数（目标≥0.90）")
+    k_stable: float = Field(..., description="K安：直行温度安定系数")
+    k1: float = Field(..., description="K1：推焦计划系数")
+    k2: float = Field(..., description="K2：推焦执行系数")
+    k3: float = Field(..., description="K3：推焦总系数，恒等于 K1×K2（目标≥0.95）")
+
+
+class KCoefficientsResponse(BaseModel):
+    """GET /furnace/k-coefficients 响应（班次记录列表，供趋势展示）。"""
+
+    records: list[KShiftRecord]

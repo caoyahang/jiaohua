@@ -109,8 +109,8 @@ export default function DashboardPage() {
         />
 
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
-          <ThermalKChart rows={kData?.coefficients ?? []} mock={kData?.__mock === true} />
-          <PushKChart rows={kData?.coefficients ?? []} mock={kData?.__mock === true} />
+          <ThermalKChart rows={kData?.records ?? []} mock={kData?.__mock === true} />
+          <PushKChart rows={kData?.records ?? []} mock={kData?.__mock === true} />
         </div>
 
         <div className="mt-4 grid items-start gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(360px,2fr)]">

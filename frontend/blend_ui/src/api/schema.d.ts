@@ -337,6 +337,60 @@ export interface components {
             is_false_positive: boolean;
         };
         /**
+         * AckResponse
+         * @description POST /vision/alarms/{id}/ack 响应。
+         */
+        AckResponse: {
+            /** Alarm Id */
+            alarm_id: number;
+            /** Status */
+            status: string;
+        };
+        /**
+         * BlendSolution
+         * @description 单套配煤方案（方案§4.1.5 输出规范）。
+         *
+         *     字段与 models/blending_optimizer/optimizer.py 的 BlendSolution 对齐，
+         *     此处为服务层契约（不依赖 scikit-opt 重依赖，可被路由轻量引用）。
+         */
+        BlendSolution: {
+            /**
+             * Type
+             * @description 方案类型：cost_optimal/quality_stable/balanced
+             */
+            type: string;
+            /**
+             * Blend Ratio
+             * @description 各煤种配比（和为1）
+             */
+            blend_ratio: {
+                [key: string]: number;
+            };
+            /**
+             * Estimated Cost
+             * @description 预估吨煤成本 元/吨
+             */
+            estimated_cost: number;
+            /**
+             * Predicted Quality
+             * @description 预测质量：M25/M10/CSR/CRI
+             */
+            predicted_quality: {
+                [key: string]: number;
+            };
+            /**
+             * Confidence
+             * @description 置信度 0~1
+             */
+            confidence: number;
+            /**
+             * Explanation
+             * @description SHAP/边际贡献中文解释
+             * @default
+             */
+            explanation: string;
+        };
+        /**
          * CoalInfo
          * @description 可用煤种信息（含库存约束与化验指标）。
          */
@@ -411,10 +465,98 @@ export interface components {
              */
             confirm: boolean;
         };
+        /**
+         * ControlModeResponse
+         * @description POST /furnace/control-mode 响应（方案§4.2.2）。
+         */
+        ControlModeResponse: {
+            /**
+             * Furnace Id
+             * @description 焦炉编号
+             */
+            furnace_id: number;
+            /**
+             * Mode
+             * @description 切换后的控制模式
+             */
+            mode: string;
+            /**
+             * Status
+             * @description 状态：ok
+             */
+            status: string;
+        };
+        /**
+         * DevicesResponse
+         * @description GET /pdm/devices 响应。
+         */
+        DevicesResponse: {
+            /** Devices */
+            devices: components["schemas"]["PdmDevice"][];
+            /** Total */
+            total: number;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * KCoefficientsResponse
+         * @description GET /furnace/k-coefficients 响应（班次记录列表，供趋势展示）。
+         */
+        KCoefficientsResponse: {
+            /** Records */
+            records: components["schemas"]["KShiftRecord"][];
+        };
+        /**
+         * KShiftRecord
+         * @description 单班次热工/推焦 K 系数（方案§4.2.6 统一考核口径）。
+         *
+         *     字段名与 `docs/API文档.md` §GET /furnace/k-coefficients 契约一致；
+         *     K3 恒等于 K1×K2（红线恒等式，见 data/pipeline/k_coefficients.py）。
+         */
+        KShiftRecord: {
+            /**
+             * Furnace Id
+             * @description 焦炉编号
+             */
+            furnace_id: number;
+            /**
+             * Shift Date
+             * @description 班次日期 YYYY-MM-DD
+             */
+            shift_date: string;
+            /**
+             * Shift
+             * @description 班次：早班/中班/晚班
+             */
+            shift: string;
+            /**
+             * K Uniform
+             * @description K均：直行温度均匀系数（目标≥0.90）
+             */
+            k_uniform: number;
+            /**
+             * K Stable
+             * @description K安：直行温度安定系数
+             */
+            k_stable: number;
+            /**
+             * K1
+             * @description K1：推焦计划系数
+             */
+            k1: number;
+            /**
+             * K2
+             * @description K2：推焦执行系数
+             */
+            k2: number;
+            /**
+             * K3
+             * @description K3：推焦总系数，恒等于 K1×K2（目标≥0.95）
+             */
+            k3: number;
         };
         /**
          * LabFeedback
@@ -462,6 +604,137 @@ export interface components {
              * @default cost
              */
             priority: string;
+        };
+        /**
+         * OptimizeResponse
+         * @description 配煤优化响应（方案§4.1.5）。
+         */
+        OptimizeResponse: {
+            /**
+             * Solutions
+             * @description 三套方案
+             */
+            solutions: components["schemas"]["BlendSolution"][];
+            /**
+             * Model Version
+             * @description 模型版本
+             */
+            model_version: string;
+            /**
+             * Compute Time Ms
+             * @description 求解耗时 毫秒
+             * @default 0
+             */
+            compute_time_ms: number;
+        };
+        /**
+         * PdmAlarm
+         * @description PdM 告警（GET /pdm/alarms 响应元素，方案§4.3.2 两级预警）。
+         */
+        PdmAlarm: {
+            /** Alarm Id */
+            alarm_id: number;
+            /** Equipment Id */
+            equipment_id: number;
+            /**
+             * Level
+             * @description 告警级别：WARNING/DANGER
+             */
+            level: string;
+            /**
+             * Source
+             * @description 来源：level1_anomaly/level2_trend_forecast
+             */
+            source: string;
+            /** Metric */
+            metric?: string | null;
+            /** Metric Value */
+            metric_value?: number | null;
+            /** Threshold */
+            threshold?: number | null;
+            /** Iso10816 Zone */
+            iso10816_zone?: string | null;
+            /** Msg */
+            msg?: string | null;
+            /** Acknowledged */
+            acknowledged: boolean;
+            /** Handler */
+            handler?: string | null;
+            /** Ack Comment */
+            ack_comment?: string | null;
+            /** Acked At */
+            acked_at?: string | null;
+            /** Ts */
+            ts: string;
+        };
+        /**
+         * PdmAlarmsResponse
+         * @description GET /pdm/alarms 响应。
+         */
+        PdmAlarmsResponse: {
+            /** Items */
+            items: components["schemas"]["PdmAlarm"][];
+        };
+        /**
+         * PdmDevice
+         * @description 监控设备（GET /pdm/devices 响应元素，方案§4.3.1 监控对象清单）。
+         */
+        PdmDevice: {
+            /** Device Id */
+            device_id: string;
+            /** Name */
+            name: string;
+            /**
+             * Priority
+             * @description 优先级：P0/P1/P2
+             */
+            priority: string;
+            /**
+             * Sensors
+             * @description 监测传感器类型
+             */
+            sensors: string[];
+        };
+        /**
+         * RecipeListResponse
+         * @description GET /blend/recipes 响应。
+         */
+        RecipeListResponse: {
+            /** Recipes */
+            recipes: components["schemas"]["RecipeRow"][];
+        };
+        /**
+         * RecipeRow
+         * @description 历史配煤方案行（blend_recipe 表，方案§3.4.1）。
+         */
+        RecipeRow: {
+            /** Id */
+            id: number;
+            /** Batch No */
+            batch_no: string;
+            /** Furnace Id */
+            furnace_id: number;
+            /** Production Date */
+            production_date?: string | null;
+            /** Total Coal Tons */
+            total_coal_tons?: number | null;
+            /** Estimated Cost Per Ton */
+            estimated_cost_per_ton?: number | null;
+            /** Actual Cost Per Ton */
+            actual_cost_per_ton?: number | null;
+            /**
+             * Ai Generated
+             * @default false
+             */
+            ai_generated: boolean;
+            /** Operator Id */
+            operator_id?: number | null;
+            /** Approved By */
+            approved_by?: number | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Notes */
+            notes?: string | null;
         };
         /**
          * TargetQuality
@@ -520,6 +793,44 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * VisionAlarm
+         * @description 视觉告警（GET /vision/alarms 响应元素，方案§3.4.7/§4.4.1）。
+         */
+        VisionAlarm: {
+            /** Alarm Id */
+            alarm_id: number;
+            /** Scene */
+            scene: string;
+            /** Area */
+            area?: string | null;
+            /** Camera Id */
+            camera_id: string;
+            /** Label */
+            label?: string | null;
+            /** Confidence */
+            confidence?: number | null;
+            /** Level */
+            level?: string | null;
+            /** Msg */
+            msg?: string | null;
+            /** Snapshot Url */
+            snapshot_url?: string | null;
+            /** Acknowledged */
+            acknowledged: boolean;
+            /** Is False Positive */
+            is_false_positive: boolean;
+            /** Ts */
+            ts: string;
+        };
+        /**
+         * VisionAlarmsResponse
+         * @description GET /vision/alarms 响应。
+         */
+        VisionAlarmsResponse: {
+            /** Items */
+            items: components["schemas"]["VisionAlarm"][];
         };
     };
     responses: never;
@@ -582,7 +893,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OptimizeResponse"];
                 };
             };
             /** @description Validation Error */
@@ -614,7 +925,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["RecipeListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -742,7 +1053,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ControlModeResponse"];
                 };
             };
             /** @description Validation Error */
@@ -774,7 +1085,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["KCoefficientsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -805,7 +1116,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["DevicesResponse"];
                 };
             };
             /** @description Validation Error */
@@ -872,7 +1183,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PdmAlarmsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -911,7 +1222,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["VisionAlarmsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -946,7 +1257,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["AckResponse"];
                 };
             };
             /** @description Validation Error */

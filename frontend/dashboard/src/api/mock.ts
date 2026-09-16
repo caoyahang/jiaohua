@@ -57,7 +57,7 @@ export function mockKCoefficients(furnaceId = 1): KCoefficientsResponse {
       });
     });
   }
-  return { coefficients: rows };
+  return { records: rows };
 }
 
 /** GET /vision/alarms 的 mock（503/断网时降级，形状与契约一致：items 数组） */

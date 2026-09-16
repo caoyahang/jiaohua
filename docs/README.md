@@ -70,6 +70,8 @@
 | 2026-09-16 | 数据质量日报统计落地 + 文档一致性收尾 | 新增 `data/pipeline/quality_report.py`（覆盖率/在线率/各标记计数统计，方案§3.3）+ `tests/unit/test_quality_report.py`；`services/scheduler/jobs.py` 日报任务接入统计函数并修正 `data_quality_report` 表待建的口径矛盾；`scripts/model_retrain.sh` 训练参数对齐 `train.py --config`（evaluate/anomaly_detect 无 CLI 标注 TODO）；修正远程地址大小写（Cyahang→caoyahang） |
 | 2026-09-16 | 后端接口补 response_model（前后端契约强类型化） | 7 个已实现路由补齐响应契约：`/blend/optimize`、`/blend/recipes`、`/furnace/control-mode`、`/pdm/devices`、`/pdm/alarms`、`/vision/alarms`、`/vision/alarms/{id}/ack`；新建 `services/api/schemas/pdm.py`，blend/furnace/vision schema 追加响应模型；重新导出 `frontend/shared/openapi.json`。未实现路由（temp/ai-setpoint/k-coefficients/health/feedback）响应契约待定契约后补 |
 | 2026-09-16 | 模型层规则补齐：懒加载整改 + 三件套 CLI | sko/shap 4 处函数体内懒加载（optimizer/mpc_controller/explainer/evaluate）；torch/ultralytics 改 PEP 562 包级懒加载（pdm/__init__.py、vision/__init__.py）；alarm_engine 的 redis/Detection 移 TYPE_CHECKING；evaluate.py/anomaly_detect.py 补 main + argparse；四个模型包未装重依赖均可轻量 import |
+| 2026-09-16 | K 系数接口契约统一（消解前后端字段分歧） | `/furnace/k-coefficients` 响应定为班次记录列表 `{records: [...]}`（原 API 文档单对象示例不满足近 7 天趋势展示）；K均/K安字段名统一 `k_uniform`/`k_stable`（后端 `compute_all` 由 `k_jun`/`k_an` 更名）；补 `response_model`，重新导出 openapi.json 并四模块 gen:api；dashboard 的 `coefficients` 键名对齐为 `records` |
+
 
 
 

@@ -171,8 +171,10 @@ def compute_all(
     的常见情况，见4.2.6数据来源说明）。
     """
     result: Dict[str, float] = {
-        "k_jun": k_jun(measured_temps, standard_temp),
-        "k_an": k_an(shift_standard_temps),
+        # 字段名与 API 契约一致（docs/API文档.md §GET /furnace/k-coefficients）：
+        # k_uniform / k_stable / k1 / k2 / k3
+        "k_uniform": k_jun(measured_temps, standard_temp),
+        "k_stable": k_an(shift_standard_temps),
         "k1": float("nan"),
         "k2": float("nan"),
         "k3": float("nan"),

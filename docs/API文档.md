@@ -249,26 +249,30 @@
 
 ### GET /furnace/k-coefficients
 
-查询热工/推焦 K 系数（V1.1 §4.2.6 统一口径）。
+查询热工/推焦 K 系数班次记录列表（V1.1 §4.2.6 统一口径），供近 7 天趋势展示。
 
-**查询参数**：`furnace_id`、`shift_date`、`shift`（班次）
+**查询参数**：`furnace_id`（必填）、`shift_date`（可选，按日期过滤）
 
 **响应**
 
 ```json
 {
-  "furnace_id": 1,
-  "shift_date": "2026-07-26",
-  "shift": "早班",
-  "k_uniform": 0.91,
-  "k_stable": 0.88,
-  "k1": 0.96,
-  "k2": 0.94,
-  "k3": 0.9024
+  "records": [
+    {
+      "furnace_id": 1,
+      "shift_date": "2026-09-15",
+      "shift": "早班",
+      "k_uniform": 0.91,
+      "k_stable": 0.88,
+      "k1": 0.96,
+      "k2": 0.94,
+      "k3": 0.9024
+    }
+  ]
 }
 ```
 
-K均目标 ≥ 0.90（V1.1 §10.1），K3 目标 ≥ 0.95（V1.1 §4.5.1）。
+K均目标 ≥ 0.90（V1.1 §10.1），K3 目标 ≥ 0.95（V1.1 §4.5.1）；K3 恒等于 K1×K2（红线恒等式）。
 
 ---
 
@@ -410,3 +414,5 @@ Prometheus 抓取端点（无需认证，仅容器网络内开放），配置见
 |---|---|---|
 | 2026-08-15 | §5 告警接口对齐实现：`/pdm/alarms` 补 limit 参数与透传字段、明确 level/source 口径；`/vision/alarms` 补透传字段、新增 ack 小节；`/pdm/devices` 改为与代码一致的内存注册表现状（标注台账落库后切换整型主键）；`/pdm/devices/{id}/health` 标注 503 未部署 | `services/api/routes/pdm.py`、`services/api/routes/vision.py` |
 | 2026-08-30 | 消除控制/回流假成功：`/blend/feedback` 与 `/furnace/ai-setpoint` 未就绪时返回 503；控制模式只允许 shadow/auto、强制双人确认且 Redis 失败返回 503；健康检查缺依赖时明确 degraded；认证配置缺失返回 503 | `services/api/routes/blend.py`、`services/api/routes/furnace.py`、`services/api/schemas/furnace.py`、`services/api/main.py`、`services/api/core/security.py` |
+| 2026-09-16 | `/furnace/k-coefficients` 契约统一：响应改为班次记录列表 `{records: [...]}`（原单对象示例不满足近 7 天趋势展示）；K均/K安字段名统一为 `k_uniform`/`k_stable`（后端 `compute_all` 同步更名）；补 `response_model` | `services/api/schemas/furnace.py`、`services/api/routes/furnace.py`、`data/pipeline/k_coefficients.py` |
+

@@ -34,7 +34,7 @@ export interface KCoefficientRow {
 }
 
 export interface KCoefficientsResponse {
-  coefficients: KCoefficientRow[];
+  records: KCoefficientRow[];
 }
 
 // ---------- 安全视觉告警（GET /vision/alarms 真实查询 vision_alarm 表，503/断网降级 mock） ----------

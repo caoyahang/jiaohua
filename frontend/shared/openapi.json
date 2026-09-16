@@ -389,7 +389,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/KCoefficientsResponse"
+                }
               }
             }
           },
@@ -1117,6 +1119,80 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "KCoefficientsResponse": {
+        "properties": {
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/KShiftRecord"
+            },
+            "type": "array",
+            "title": "Records"
+          }
+        },
+        "type": "object",
+        "required": [
+          "records"
+        ],
+        "title": "KCoefficientsResponse",
+        "description": "GET /furnace/k-coefficients 响应（班次记录列表，供趋势展示）。"
+      },
+      "KShiftRecord": {
+        "properties": {
+          "furnace_id": {
+            "type": "integer",
+            "title": "Furnace Id",
+            "description": "焦炉编号"
+          },
+          "shift_date": {
+            "type": "string",
+            "title": "Shift Date",
+            "description": "班次日期 YYYY-MM-DD"
+          },
+          "shift": {
+            "type": "string",
+            "title": "Shift",
+            "description": "班次：早班/中班/晚班"
+          },
+          "k_uniform": {
+            "type": "number",
+            "title": "K Uniform",
+            "description": "K均：直行温度均匀系数（目标≥0.90）"
+          },
+          "k_stable": {
+            "type": "number",
+            "title": "K Stable",
+            "description": "K安：直行温度安定系数"
+          },
+          "k1": {
+            "type": "number",
+            "title": "K1",
+            "description": "K1：推焦计划系数"
+          },
+          "k2": {
+            "type": "number",
+            "title": "K2",
+            "description": "K2：推焦执行系数"
+          },
+          "k3": {
+            "type": "number",
+            "title": "K3",
+            "description": "K3：推焦总系数，恒等于 K1×K2（目标≥0.95）"
+          }
+        },
+        "type": "object",
+        "required": [
+          "furnace_id",
+          "shift_date",
+          "shift",
+          "k_uniform",
+          "k_stable",
+          "k1",
+          "k2",
+          "k3"
+        ],
+        "title": "KShiftRecord",
+        "description": "单班次热工/推焦 K 系数（方案§4.2.6 统一考核口径）。\n\n字段名与 `docs/API文档.md` §GET /furnace/k-coefficients 契约一致；\nK3 恒等于 K1×K2（红线恒等式，见 data/pipeline/k_coefficients.py）。"
       },
       "LabFeedback": {
         "properties": {

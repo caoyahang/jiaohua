@@ -15,7 +15,11 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from services.api.core.security import get_current_user
 from services.api.db.connections import get_redis, get_td_conn
-from services.api.schemas.furnace import ControlModeRequest, ControlModeResponse
+from services.api.schemas.furnace import (
+    ControlModeRequest,
+    ControlModeResponse,
+    KCoefficientsResponse,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/furnace", tags=["焦炉加热控制"])
@@ -108,7 +112,7 @@ def set_control_mode(req: ControlModeRequest, user: str = Depends(get_current_us
     return {"furnace_id": req.furnace_id, "mode": req.mode, "status": "ok"}
 
 
-@router.get("/k-coefficients", summary="热工K系数查询")
+@router.get("/k-coefficients", response_model=KCoefficientsResponse, summary="热工K系数查询")
 def get_k_coefficients(furnace_id: int, shift_date: str | None = None,
                        user: str = Depends(get_current_user)):
     """返回K均/K安/K1/K2/K3（4.2.6节统一考核口径）。
